@@ -1,0 +1,9 @@
+falkordb
+falkordblite; sys_platform != "win32"
+python-dotenv
+pytest
+google-genai
+scikit-learn
+numpy
+joblib
+mcp>=2

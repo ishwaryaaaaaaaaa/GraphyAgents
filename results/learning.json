@@ -1,0 +1,107 @@
+[
+  {
+    "level": "mild",
+    "range": [
+      0.6,
+      1.6
+    ],
+    "users": 100,
+    "decisions_each": 60,
+    "windows": [
+      {
+        "window": "1-20",
+        "n": 2000,
+        "fixed_ok": 1956,
+        "learned_ok": 1957,
+        "fixed_regret": 0.013969477003661895,
+        "learned_regret": 0.013220707642322476
+      },
+      {
+        "window": "21-40",
+        "n": 2000,
+        "fixed_ok": 1959,
+        "learned_ok": 1968,
+        "fixed_regret": 0.017282523481187265,
+        "learned_regret": 0.01175496911708465
+      },
+      {
+        "window": "41-60",
+        "n": 2000,
+        "fixed_ok": 1957,
+        "learned_ok": 1973,
+        "fixed_regret": 0.016979433355862893,
+        "learned_regret": 0.006366347288590715
+      }
+    ]
+  },
+  {
+    "level": "moderate",
+    "range": [
+      0.3,
+      2.2
+    ],
+    "users": 100,
+    "decisions_each": 60,
+    "windows": [
+      {
+        "window": "1-20",
+        "n": 2000,
+        "fixed_ok": 1872,
+        "learned_ok": 1881,
+        "fixed_regret": 0.057600860166724235,
+        "learned_regret": 0.04706329781550562
+      },
+      {
+        "window": "21-40",
+        "n": 2000,
+        "fixed_ok": 1862,
+        "learned_ok": 1884,
+        "fixed_regret": 0.06206930326932103,
+        "learned_regret": 0.04359551708707297
+      },
+      {
+        "window": "41-60",
+        "n": 2000,
+        "fixed_ok": 1867,
+        "learned_ok": 1899,
+        "fixed_regret": 0.06208789486326796,
+        "learned_regret": 0.0375947753060945
+      }
+    ]
+  },
+  {
+    "level": "strong",
+    "range": [
+      0.05,
+      3.0
+    ],
+    "users": 100,
+    "decisions_each": 60,
+    "windows": [
+      {
+        "window": "1-20",
+        "n": 2000,
+        "fixed_ok": 1833,
+        "learned_ok": 1873,
+        "fixed_regret": 0.13016109165798384,
+        "learned_regret": 0.08075218227312558
+      },
+      {
+        "window": "21-40",
+        "n": 2000,
+        "fixed_ok": 1826,
+        "learned_ok": 1891,
+        "fixed_regret": 0.13899386759421872,
+        "learned_regret": 0.059845555212681145
+      },
+      {
+        "window": "41-60",
+        "n": 2000,
+        "fixed_ok": 1833,
+        "learned_ok": 1902,
+        "fixed_regret": 0.13658741000840188,
+        "learned_regret": 0.045271208949756336
+      }
+    ]
+  }
+]

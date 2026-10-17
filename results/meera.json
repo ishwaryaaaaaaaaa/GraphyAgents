@@ -1,0 +1,991 @@
+{
+  "summary": {
+    "questions": 15,
+    "arms": {
+      "first_write": {
+        "task_success": {
+          "k": 9,
+          "n": 15,
+          "pct": 60.0,
+          "ci": [
+            35.7,
+            80.2
+          ]
+        },
+        "stale_use": {
+          "k": 5,
+          "n": 15,
+          "pct": 33.3,
+          "ci": [
+            15.2,
+            58.3
+          ]
+        },
+        "wrongful_keep": {
+          "k": 2,
+          "n": 15,
+          "pct": 13.3,
+          "ci": [
+            3.7,
+            37.9
+          ]
+        }
+      },
+      "guarded": {
+        "task_success": {
+          "k": 15,
+          "n": 15,
+          "pct": 100.0,
+          "ci": [
+            79.6,
+            100.0
+          ]
+        },
+        "stale_use": {
+          "k": 0,
+          "n": 15,
+          "pct": 0.0,
+          "ci": [
+            0.0,
+            20.4
+          ]
+        },
+        "wrongful_keep": {
+          "k": 0,
+          "n": 15,
+          "pct": 0.0,
+          "ci": [
+            0.0,
+            20.4
+          ]
+        }
+      },
+      "last_write_wins": {
+        "task_success": {
+          "k": 12,
+          "n": 15,
+          "pct": 80.0,
+          "ci": [
+            54.8,
+            93.0
+          ]
+        },
+        "stale_use": {
+          "k": 2,
+          "n": 15,
+          "pct": 13.3,
+          "ci": [
+            3.7,
+            37.9
+          ]
+        },
+        "wrongful_keep": {
+          "k": 2,
+          "n": 15,
+          "pct": 13.3,
+          "ci": [
+            3.7,
+            37.9
+          ]
+        }
+      }
+    },
+    "by_trap": {
+      "cascade": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 0
+      },
+      "control": {
+        "n": 1,
+        "first_write": 1,
+        "guarded": 1,
+        "last_write_wins": 1
+      },
+      "diet_change": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 1
+      },
+      "dislike": {
+        "n": 1,
+        "first_write": 1,
+        "guarded": 1,
+        "last_write_wins": 1
+      },
+      "double_change": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 1
+      },
+      "goal_ended": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 0
+      },
+      "promise": {
+        "n": 3,
+        "first_write": 3,
+        "guarded": 3,
+        "last_write_wins": 3
+      },
+      "retraction": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 0
+      },
+      "streak": {
+        "n": 4,
+        "first_write": 4,
+        "guarded": 4,
+        "last_write_wins": 4
+      },
+      "taste_flip": {
+        "n": 1,
+        "first_write": 0,
+        "guarded": 1,
+        "last_write_wins": 1
+      }
+    },
+    "guarded_only": {
+      "wrongful_drop": {
+        "k": 0,
+        "n": 15,
+        "pct": 0.0,
+        "ci": [
+          0.0,
+          20.4
+        ]
+      },
+      "cascade_completeness": {
+        "k": 2,
+        "n": 2,
+        "pct": 100.0,
+        "ci": [
+          34.2,
+          100.0
+        ]
+      },
+      "time_travel": {
+        "k": 10,
+        "n": 10,
+        "pct": 100.0,
+        "ci": [
+          72.2,
+          100.0
+        ]
+      },
+      "audit_coverage": {
+        "k": 15,
+        "n": 15,
+        "pct": 100.0,
+        "ci": [
+          79.6,
+          100.0
+        ]
+      }
+    }
+  },
+  "runs": [
+    {
+      "asks": [
+        {
+          "id": "Q1",
+          "day": 2,
+          "trap": "control",
+          "expect": "dal_rice",
+          "heldout": false,
+          "options": [
+            "fried_chicken",
+            "dal_rice"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "dal_rice",
+              "ok": true,
+              "used": [
+                "f1",
+                "f5",
+                "f6"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "dal_rice",
+              "ok": true,
+              "used": [
+                "f1",
+                "f5",
+                "f6"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "dal_rice",
+              "ok": true,
+              "used": [
+                "f1",
+                "f5",
+                "f6"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "you like it"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q2",
+          "day": 5,
+          "trap": "streak",
+          "expect": "skip",
+          "heldout": false,
+          "options": [
+            "gulab_jamun",
+            "skip"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "only 3 of 5 days"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q3",
+          "day": 8,
+          "trap": "streak",
+          "expect": "gulab_jamun",
+          "heldout": false,
+          "options": [
+            "gulab_jamun",
+            "skip"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "gulab_jamun",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "gulab_jamun",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "gulab_jamun",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "5 days off sugar: earned"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q4",
+          "day": 9,
+          "trap": "streak",
+          "expect": "skip",
+          "heldout": false,
+          "options": [
+            "gulab_jamun",
+            "skip"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "skip",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "only 0 of 5 days"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q5",
+          "day": 10,
+          "trap": "diet_change",
+          "expect": "chana_chaat",
+          "heldout": false,
+          "options": [
+            "fried_chicken",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f22"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f22"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "fried_chicken",
+              "ok": false,
+              "used": [
+                "f1",
+                "f5"
+              ],
+              "stale": [
+                "f1"
+              ],
+              "stale_use": true,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "you are vegetarian"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q6",
+          "day": 14,
+          "trap": "streak",
+          "expect": "ice_cream",
+          "heldout": false,
+          "options": [
+            "ice_cream",
+            "skip"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "ice_cream",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "ice_cream",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "ice_cream",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "5 days off sugar: earned"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q7",
+          "day": 15,
+          "trap": "taste_flip",
+          "expect": "chana_chaat",
+          "heldout": false,
+          "options": [
+            "samosa",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f29"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f29"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "samosa",
+              "ok": false,
+              "used": [
+                "f4"
+              ],
+              "stale": [
+                "f4"
+              ],
+              "stale_use": true,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q8",
+          "day": 25,
+          "trap": "cascade",
+          "expect": "chana_chaat",
+          "heldout": false,
+          "options": [
+            "mess_thali",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "mess_thali",
+              "ok": false,
+              "used": [
+                "f3",
+                "f8"
+              ],
+              "stale": [
+                "f3"
+              ],
+              "stale_use": true,
+              "wrongful_keep": true
+            },
+            "first_write": {
+              "pick": "mess_thali",
+              "ok": false,
+              "used": [
+                "f3",
+                "f8"
+              ],
+              "stale": [
+                "f3"
+              ],
+              "stale_use": true,
+              "wrongful_keep": true
+            }
+          },
+          "reasons": [
+            "not available"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q9",
+          "day": 30,
+          "trap": "promise",
+          "expect": "study_session",
+          "heldout": false,
+          "options": [
+            "study_session",
+            "netflix"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "promise: study before sleep (still open)"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q10",
+          "day": 32,
+          "trap": "promise",
+          "expect": "study_session",
+          "heldout": false,
+          "options": [
+            "study_session",
+            "netflix"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "study_session",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "promise: study before sleep (broken last time)"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q11",
+          "day": 38,
+          "trap": "dislike",
+          "expect": "chana_chaat",
+          "heldout": false,
+          "options": [
+            "paneer_wrap",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f36"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f36"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f36"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [
+            "you dislike it"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q12",
+          "day": 40,
+          "trap": "promise",
+          "expect": "netflix",
+          "heldout": false,
+          "options": [
+            "netflix",
+            "study_session"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "netflix",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "netflix",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "netflix",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q13",
+          "day": 42,
+          "trap": "retraction",
+          "expect": "paneer_wrap",
+          "heldout": false,
+          "options": [
+            "paneer_wrap",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "paneer_wrap",
+              "ok": true,
+              "used": [
+                "f7"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "chana_chaat",
+              "ok": false,
+              "used": [
+                "f36"
+              ],
+              "stale": [
+                "f36"
+              ],
+              "stale_use": true,
+              "wrongful_keep": true
+            },
+            "first_write": {
+              "pick": "chana_chaat",
+              "ok": false,
+              "used": [
+                "f36"
+              ],
+              "stale": [
+                "f36"
+              ],
+              "stale_use": true,
+              "wrongful_keep": true
+            }
+          },
+          "reasons": [
+            "you like it"
+          ],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q14",
+          "day": 51,
+          "trap": "goal_ended",
+          "expect": "gulab_jamun",
+          "heldout": false,
+          "options": [
+            "gulab_jamun",
+            "skip"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "gulab_jamun",
+              "ok": true,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "skip",
+              "ok": false,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "skip",
+              "ok": false,
+              "used": [],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [],
+          "wrongful_drop": false,
+          "audit_ok": true
+        },
+        {
+          "id": "Q15",
+          "day": 55,
+          "trap": "double_change",
+          "expect": "chana_chaat",
+          "heldout": false,
+          "options": [
+            "pasta",
+            "chana_chaat"
+          ],
+          "arms": {
+            "guarded": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f44"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "last_write_wins": {
+              "pick": "chana_chaat",
+              "ok": true,
+              "used": [
+                "f44"
+              ],
+              "stale": [],
+              "stale_use": false,
+              "wrongful_keep": false
+            },
+            "first_write": {
+              "pick": "pasta",
+              "ok": false,
+              "used": [
+                "f43"
+              ],
+              "stale": [
+                "f43"
+              ],
+              "stale_use": true,
+              "wrongful_keep": false
+            }
+          },
+          "reasons": [],
+          "wrongful_drop": false,
+          "audit_ok": true
+        }
+      ],
+      "cascade": [
+        {
+          "key": "lives_in",
+          "day": 25,
+          "expected": [
+            "mess_meals_available"
+          ],
+          "got": [
+            "mess_meals_available"
+          ],
+          "ok": true
+        },
+        {
+          "key": "dislikes:paneer_wrap",
+          "day": 41,
+          "expected": [
+            "avoid_paneer_wrap_orders"
+          ],
+          "got": [
+            "avoid_paneer_wrap_orders"
+          ],
+          "ok": true
+        }
+      ],
+      "time_travel": [
+        {
+          "id": "T1",
+          "key": "diet_style",
+          "as_of": 8,
+          "expected": "non_veg",
+          "got": "non_veg",
+          "ok": true
+        },
+        {
+          "id": "T2",
+          "key": "diet_style",
+          "as_of": 20,
+          "expected": "vegetarian",
+          "got": "vegetarian",
+          "ok": true
+        },
+        {
+          "id": "T3",
+          "key": "likes:samosa",
+          "as_of": 12,
+          "expected": "yes",
+          "got": "yes",
+          "ok": true
+        },
+        {
+          "id": "T4",
+          "key": "likes:samosa",
+          "as_of": 16,
+          "expected": "no",
+          "got": "no",
+          "ok": true
+        },
+        {
+          "id": "T5",
+          "key": "lives_in",
+          "as_of": 24,
+          "expected": "hostel",
+          "got": "hostel",
+          "ok": true
+        },
+        {
+          "id": "T6",
+          "key": "lives_in",
+          "as_of": 26,
+          "expected": "flat",
+          "got": "flat",
+          "ok": true
+        },
+        {
+          "id": "T7",
+          "key": "mess_meals_available",
+          "as_of": 24,
+          "expected": "yes",
+          "got": "yes",
+          "ok": true
+        },
+        {
+          "id": "T8",
+          "key": "mess_meals_available",
+          "as_of": 26,
+          "expected": null,
+          "got": null,
+          "ok": true
+        },
+        {
+          "id": "T9",
+          "key": "dislikes:paneer_wrap",
+          "as_of": 40,
+          "expected": null,
+          "got": null,
+          "ok": true
+        },
+        {
+          "id": "T10",
+          "key": "likes:pasta",
+          "as_of": 53,
+          "expected": "yes",
+          "got": "yes",
+          "ok": true
+        }
+      ]
+    }
+  ]
+}

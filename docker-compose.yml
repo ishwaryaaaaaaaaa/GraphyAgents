@@ -1,0 +1,27 @@
+# One command from a clean clone:  docker compose up --build --abort-on-container-exit
+# Starts FalkorDB (Browser on http://localhost:3000), then runs both evaluations against it.
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"   # database
+      - "3000:3000"   # FalkorDB Browser: see the graph
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  eval:
+    build: .
+    depends_on:
+      falkordb:
+        condition: service_healthy
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      LLM_MODE: "off"
+    volumes:
+      - ./results:/app/results
+    command: >
+      sh -c "pytest -q && python run_eval.py --set meera && python run_eval.py --set generated --seeds 300-499"
