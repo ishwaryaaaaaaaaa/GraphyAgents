@@ -2,6 +2,19 @@
 
 **An agent that never gives you advice based on something that stopped being true.**
 
+<p>
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="FalkorDB" src="https://img.shields.io/badge/FalkorDB-4.22.1-E5484D">
+  <img alt="Cypher" src="https://img.shields.io/badge/Query-Cypher-4A4A4A">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-server-7B6A9B">
+  <img alt="scikit-learn" src="https://img.shields.io/badge/scikit--learn-1.9-F7931E?logo=scikitlearn&logoColor=white">
+  <img alt="JavaScript" src="https://img.shields.io/badge/Frontend-vanilla%20JS-F7DF1E?logo=javascript&logoColor=black">
+  <img alt="Render" src="https://img.shields.io/badge/Deployed%20on-Render-46E3B7?logo=render&logoColor=black">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-299%20passing-2EA44F?logo=pytest&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-lightgrey">
+</p>
+
 I'm 20, I overthink everything, and for a long time I wanted one thing: someone who knows me well enough to just say *"yes, have the sweet, you've been off sugar for ten days"* or *"let this one go, it's the first time she's cancelled."* Not a generic chatbot. Someone who remembers who I am **today**.
 
 The problem is that most AI memory only ever adds. Tell it in March you eat meat, tell it in May you turned vegetarian, and it still suggests chicken, because both sentences are sitting in its memory and nothing says which one is still true. So I built the opposite: a memory where every fact has a life, and only the living ones are allowed near an answer. The memory is a [FalkorDB](https://www.falkordb.com) graph.
@@ -30,6 +43,23 @@ You talk to it in plain sentences. It remembers some, forgets nothing, and uses 
 Then you can drag a slider to see what it believed on any day, or open the graph and watch the exact path from you to an answer light up.
 
 ---
+
+## Built with
+
+| | What | Where it is used |
+|---|---|---|
+| **Database** | [FalkorDB](https://www.falkordb.com) 4.22.1, queried with Cypher | the whole memory: one graph per person, `algo.pageRank`, `shortestPath` |
+| **Language** | Python 3.12 | engine, tools, evaluation, tests, the web server |
+| **DB client** | `falkordb` 1.8 (server) and `falkordblite` (embedded, Linux/macOS) | `agent/db.py` |
+| **Agent protocol** | MCP (`mcp` 2.3), over stdio | `mcp_server.py`: 12 memory tools and agent-to-agent handoffs |
+| **Machine learning** | scikit-learn 1.9, NumPy, joblib | the optional trained scorer (`agent/scorer.py`) |
+| **Language model** | Gemini (optional, off by default) | turns a sentence into updates and rewords an answer; never decides what is true |
+| **Web server** | Python standard library `http.server` | `ui_server.py`, no framework |
+| **Frontend** | HTML, CSS and vanilla JavaScript in one file, inline SVG for the graph | `ui/index.html`, no build step and no dependencies |
+| **Diagrams** | Mermaid | this README |
+| **Testing** | pytest, 299 tests, plus an independent oracle and injected-bug checks | `tests/`, `eval/`, `scripts/mutation_check*.py` |
+| **Packaging** | Docker and Docker Compose | `Dockerfile`, `docker-compose.yml` |
+| **Hosting** | Render (free web service) | `render.yaml` |
 
 ## The user journey
 
