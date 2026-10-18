@@ -35,7 +35,7 @@ def _unknown_option(raw, key):
     by_tag = [n for n, i in decide.CATALOGUE.items() if key in i["tags"]]
     close = difflib.get_close_matches(key, decide.CATALOGUE, n=3, cutoff=0.6)
     hint = by_tag[:5] or close
-    msg = f"I don't know {raw!r}: it is not in my food/activity list."
+    msg = f"Okay, I haven't learned {raw!r} yet, so I can't weigh it."
     return msg + (f" Try: {', '.join(h.replace('_', ' ') for h in hint)}." if hint else "")
 
 
@@ -65,6 +65,16 @@ def parse_fork(line):
     return names, single or len(names) == 1
 
 
+REMEMBER_GUIDE = (
+    "Here is what I'm good at remembering. Say it in your own words, for example:\n"
+    "  - food: \"I eat meat\", \"I'm vegetarian\", \"I love samosa\", \"I hate pasta\"\n"
+    "  - goals: \"I want to cut sugar\", \"I stayed off sugar today\"\n"
+    "  - promises: \"I promise to study tonight\"\n"
+    "  - people: \"my friend Sam cancelled again, should I say something?\"\n"
+    "I know foods like pasta, samosa, ice cream, paneer wrap, masala dosa, fried chicken, sprouts, "
+    "salad bowl and chana chaat (44 in all). Then ask me to choose, like \"pasta or sprouts?\"")
+
+
 class Session:
     def __init__(self, user="you", day=1, auto=False, mode="rules"):
         self.user, self.day, self.auto, self.mode = user, day, auto, mode
@@ -75,7 +85,7 @@ class Session:
 
     # -- helpers --
     def _apply(self, ops):
-        return "Done: " + "; ".join(extract.apply_ops(self.user, ops, self.day)) + "."
+        return "Okay, noted: " + "; ".join(extract.apply_ops(self.user, ops, self.day)) + "."
 
     def _ask(self, names, add_skip):
         res = decide.decide(self.user, self.day, names, add_skip=add_skip, mode=self.mode)
@@ -148,7 +158,7 @@ class Session:
         notes += extract.apply_ops(self.user, stated, self.day)
         cid = store.contact_id(sit["contact"])
         if not tools.get_contact(self.user, cid):
-            return f"I don't know {sit['contact']} yet. Try: 'my friend {sit['contact']} ...'"
+            return f"Okay, I haven't met {sit['contact']} yet. Tell me who they are first, like 'my friend {sit['contact']} ...'"
         res = counsel.counsel(self.user, cid, self.day, kind=sit["kind"], options=sit["options"])
         self.last_decision = {"decision_id": res["decision_id"], "pick": res["verdict"]}
         head = f"(noted: {'; '.join(notes)})\n" if notes else ""
@@ -176,9 +186,9 @@ class Session:
 
     def _tell(self, line):
         got = extract.extract(line, self.day, contacts=self._contact_names())
-        msgs = [f"(couldn't use: {e})" for e in got["errors"]]
+        msgs = [f"(skipped: {e})" for e in got["errors"]]
         if not got["ops"]:
-            return "\n".join(msgs + ["I didn't find anything to remember in that."])
+            return "\n".join(msgs + ["Okay, no worries. I couldn't turn that into something to remember.", REMEMBER_GUIDE])
         sure, unsure = extract.split_by_confidence(got["ops"])
         if unsure:
             self.pending = unsure + ([] if self.auto else sure)
@@ -200,10 +210,10 @@ class Session:
             return HELP
         if cmd == "/next":
             self.day += 1
-            return f"Day {self.day}." + self._pending_note()
+            return f"Okay, it's day {self.day} now." + self._pending_note()
         if cmd == "/day" and args and args[0].isdigit():
             self.day = int(args[0])
-            return f"Day {self.day}." + self._pending_note()
+            return f"Okay, it's day {self.day} now." + self._pending_note()
         if cmd == "/people":
             return self._people()
         if cmd == "/values":

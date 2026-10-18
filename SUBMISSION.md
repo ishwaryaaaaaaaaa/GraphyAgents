@@ -1,5 +1,37 @@
 # Submission answers (copy and paste)
 
+## The form, field by field
+
+**Project title**
+
+Decisive
+
+**Description** (What problem does your project solve, and who is it for?)
+
+Every AI assistant that remembers you has the same hidden flaw: it never lets go. Tell it in March that you eat meat, tell it in May that you have turned vegetarian, and it still recommends chicken. Not because it forgot, but because it cannot tell which of the two is true any more. The result is advice that sounds personal, confident, and wrong.
+
+Decisive fixes the memory itself. It stores your life as a FalkorDB graph where every fact has a life: replaced, retracted, rewound, never deleted. Only what is true today is allowed to touch an answer, and every answer comes with receipts: the exact facts it used and the path through the graph that led there. Made a mistake? Say so once, and that fact disappears along with every conclusion built on it.
+
+It is for anyone whose life keeps changing and who wants advice they can check instead of trust, and for people building AI agents who need memory that stays correct as the world moves. On 3,595 held-out questions it used zero stale facts; a "newest write wins" memory used 648.
+
+**How did you use FalkorDB in your project? Tell us what technical problems you solved using FalkorDB.**
+
+The whole memory is a FalkorDB graph, one graph per person. It solved these problems:
+
+- **Stale facts reaching answers.** Every fact is a node with a status (active, superseded, retracted, invalidated). All reads go through one guard, `MATCH (f:Fact) WHERE f.status='active' ...`, and a test makes sure only three files can touch facts at all. Result: 0 stale facts used in 3,595 held-out questions, where a "newest write wins" memory used 648.
+- **Conclusions that depend on a wrong fact.** Derived facts link back with `DERIVED_FROM`. Retracting a mistake runs one variable-length traversal, `(f)<-[:DERIVED_FROM*1..6]-(d)`, and drops everything built on it.
+- **"What did it believe on day 8?"** Facts carry `valid_from` and `valid_to`, so time travel is a single query. Replaced facts keep a `SUPERSEDED_BY` edge, so history is never lost.
+- **Explaining a decision.** Each decision is linked to the facts it used. A `shortestPath` from the person to the decision gives the audit trail, which the website draws as a graph you can click.
+- **Ranking goals.** `algo.pageRank` over goal events.
+- **Many agents on one memory (Track 2).** A lock, a repair step that keeps the `SUPERSEDED_BY` chain linear, and an atomic claim for handoffs over MCP. Without them, 8 threads left 111 active facts in a slot that should have one. With them, 1.
+- **Privacy between people.** One graph per person, checked at every question: 0 leaks with 16 people running at once.
+
+**Blog link**
+
+https://github.com/ishwaryaaaaaaaaa/GraphyAgents/blob/main/BLOG.md (the post is in the repo as `BLOG.md`; paste a dev.to or Medium link here instead if you publish it there)
+
+---
+
 Fill the three links when you have them: repo, live demo, video.
 
 - **Repo:** https://github.com/ishwaryaaaaaaaaa/GraphyAgents

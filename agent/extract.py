@@ -161,7 +161,7 @@ class _NoItem(Exception):
 def _item(text):
     item = _norm_item(text)
     if item is None:
-        raise _NoItem(f"I don't know {text.strip()!r}: it is not in my food list")
+        raise _NoItem(f"I haven't learned {text.strip()!r} yet, it is not in my food list")
     return item
 
 
