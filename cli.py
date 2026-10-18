@@ -135,6 +135,15 @@ def _friendly(ops, lines):
     return " ".join(said) + " (saved: " + "; ".join(lines) + ".)"
 
 
+_FEELING = (r"i(?: am|'m| feel| am feeling|'m feeling)(?: so| really| very| a bit| kind of| just)? "
+            r"(sad|anxious|stressed|tired|overwhelmed|nervous|worried|lonely|upset|angry|scared|"
+            r"confused|low|exhausted|down|burnt out|burned out)")
+_WHAT_I_DO = ("I'm Decisive, a decision partner with a memory. Tell me about your life in plain words "
+              "(what you eat, your goals, your friends). When you ask me to choose, I only use what is "
+              "true today, and I show you the facts I used. Try \"I turned vegetarian\", then "
+              "\"what should I eat?\".")
+
+
 class Session:
     def __init__(self, user="you", day=1, auto=False, mode="rules"):
         self.user, self.day, self.auto, self.mode = user, day, auto, mode
@@ -244,10 +253,54 @@ class Session:
                          + (f", centrality {ranks[c['id']]:.2f}" if c["id"] in ranks else ""))
         return "\n".join(lines)
 
+    def _converse(self, line):
+        """Talk like a person when the message is not something to remember: greetings, thanks, what can
+        you do, an open "what should I eat?" (answered from memory), feelings, other questions. Returns
+        None when nothing fits, and the caller falls back to the guide."""
+        t = re.sub(r"\s+", " ", line.lower().strip(" .!?"))
+        facts = tools.get_facts(self.user, self.day)
+        diet = (facts.get("diet_style") or (None,))[0]
+        known = {"non_veg": " I remember you eat meat.", "vegetarian": " I remember you're vegetarian."}.get(diet, "")
+        if re.fullmatch(r"(?:hi+|hello+|hey+|hiya|yo|hey there|hi there|hello there|good (?:morning|afternoon|evening|night))", t):
+            return "Hey! Good to see you." + (known or " Tell me one thing about yourself, or ask me to choose between two things.")
+        if re.fullmatch(r"(?:thanks|thank you|thx|ty|thanks a lot|thank you so much|thanks so much)", t):
+            return "Anytime! If a choice turns out well or badly, tell me, and I'll learn from it."
+        if re.fullmatch(r"(?:how are you|how are you doing|how's it going|what's up|sup|how do you do)", t):
+            return "I'm doing well, thanks for asking! Mostly I'm waiting to hear how your day is going. What's on your mind?"
+        if re.search(r"\b(?:who|what) (?:are|is) (?:you|this)\b|what can you do|what do you do|how does (?:this|it) work|"
+                     r"^help(?: me)?$|tell me about yourself|can you help", t):
+            return _WHAT_I_DO
+        if re.search(r"\b(?:what|which)\b.*\b(?:should|shall|can|could)\b.*\b(?:i|we)\b.*\b(?:eat|have|order|cook|get|snack)\b|"
+                     r"\bwhat to (?:eat|order|have|cook)\b|\b(?:i am|i'm) (?:so |very |really )?(?:hungry|starving)\b|"
+                     r"\bsuggest\b.*\b(?:food|meal|snack|dinner|lunch|breakfast|dessert)\b|\b(?:dinner|lunch|snack) ideas\b|"
+                     r"\bi want (?:to eat )?something\b", t):
+            tag = "dessert" if re.search(r"dessert|sweet", t) else "snack" if "snack" in t else "meal"
+            names = [n for n, i in decide.CATALOGUE.items() if tag in i["tags"] and "requires" not in i]
+            intro = "" if facts else "I don't know much about you yet, so this is a general pick. "
+            return intro + self._ask(names, False)
+        m = re.search(_FEELING, t)
+        if m:
+            return (f"That sounds heavy, and I'm glad you told me. I can't help with feeling {m[1]} the way a good "
+                    "friend can, but I'm listening. If something happened with someone, tell me about them "
+                    "(\"my friend Sam ...\") and I'll help you think it through.")
+        if line.strip().endswith("?") or re.match(r"(?:should|could|would|can|is|am|do|does|will|why|how|when|where|who)\b", t):
+            return ("Good question. I can't answer that one, because I only weigh food choices and friendships. "
+                    "If you're choosing between two things I know, ask like \"pasta or sprouts?\". If it's about "
+                    "a friend, tell me what happened.")
+        if re.match(r"(?:i am|i'm|i have|i work|i study|i live|i go|i was|i got|my name is|my )", t):
+            return (f"Thanks for telling me that. I can't keep \"{line.strip().rstrip('.!')[:80]}\" as a memory yet, "
+                    "because right now I only track food, goals, promises and the people in your life. "
+                    "Say it one of those ways, like \"I'm trying to cut sugar\" or \"my friend Sam cancelled again\", "
+                    "and I'll remember it.")
+        return None
+
     def _tell(self, line):
         got = extract.extract(line, self.day, contacts=self._contact_names())
         msgs = [f"(skipped: {e})" for e in got["errors"]]
         if not got["ops"]:
+            said = None if got["errors"] else self._converse(line)
+            if said:
+                return said
             return "\n".join(msgs + ["Okay, fair enough! I can't turn that into something I remember yet, but I'm happy to listen.", REMEMBER_GUIDE])
         sure, unsure = extract.split_by_confidence(got["ops"])
         if unsure:
@@ -359,6 +412,10 @@ class Session:
         try:
             fork = parse_fork(line)
         except ValueError as e:
+            if " or " not in line.lower():           # "should I quit my job?" is a question, not a food fork
+                said = self._converse(line)
+                if said:
+                    return said
             return str(e)
         if fork:
             return self._ask(*fork)

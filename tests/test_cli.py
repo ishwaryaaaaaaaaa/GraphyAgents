@@ -134,3 +134,30 @@ def test_help_unknown_and_reset(chat):
     assert out.startswith("Okay, fair enough") and "pasta or sprouts?" in out    # friendly, and it says what it can do
     out = chat.handle("I like quinoa bowls")                     # a food it has not learned
     assert "haven't learned" in out and "pasta or sprouts?" in out
+
+
+def test_it_talks_back_differently_to_different_things(chat):
+    greet = chat.handle("hello")
+    thanks = chat.handle("thanks")
+    who = chat.handle("who are you?")
+    sad = chat.handle("I'm so tired")
+    job = chat.handle("should I quit my job?")
+    other = chat.handle("I am a software engineer")
+    replies = [greet, thanks, who, sad, job, other]
+    assert len(set(replies)) == len(replies)               # no two different messages get the same reply
+    assert greet.startswith("Hey!") and thanks.startswith("Anytime") and "decision partner" in who
+    assert "feeling tired" in sad and "only weigh food choices" in job and "can't keep" in other
+
+
+def test_an_open_food_question_is_answered_from_memory(chat):
+    chat.handle("I eat meat again")
+    chat.handle("I turned vegetarian")
+    out = chat.handle("what should I eat today?")
+    assert chat.last_decision and "vegetarian" in out and "general pick" not in out
+    assert "not available" not in out
+    from agent import store
+    fresh = cli.Session(chat.user + "x", day=1, auto=True)
+    try:
+        assert "I don't know much about you yet" in fresh.handle("what should I eat?")
+    finally:
+        store.reset(chat.user + "x")
