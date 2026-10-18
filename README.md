@@ -68,7 +68,7 @@ journey
     title A first visit to Decisive
     section Arrive
       Read what it is and why it is different: 5: You
-      Start with a blank memory, or watch the demo: 5: You
+      Open the app with a blank memory: 5: You
     section Teach it
       Say I eat meat again: 5: You
       Say I love samosa: 4: You
@@ -707,13 +707,13 @@ A small local website over the same agent, designed for someone who has never se
 python ui_server.py            # then open http://127.0.0.1:8765   (--port to change it)
 ```
 
-- **A landing page first** (cream background, serif headlines): one sentence on what it is, a before/after showing the problem it solves (an assistant that still recommends fried chicken after you turned vegetarian), three steps, who it is for. "Try the demo" plays an example; "Get started" opens the app.
-- **Nobody is pre-loaded.** The visitor gets a new, empty, private memory (a random id kept in that browser tab only). A left sidebar holds the pages: **Chat**, **Memory**, **Graph**, **People**, **Demo story**, plus recent decisions.
+- **A landing page first** (cream background, serif headlines): one sentence on what it is, a before/after showing the problem it solves (an assistant that still recommends fried chicken after you turned vegetarian), three steps, who it is for. "Try it now" opens a blank chat: nothing is pre-filled, you type your own words.
+- **Nobody is pre-loaded.** The visitor gets a new, empty, private memory (a random id kept in that browser tab only). A left sidebar holds the pages: **Chat**, **Memory**, **Graph**, **People**, plus recent decisions.
 - **Chat** shows answers as cards: the pick, a plain reason, a low-confidence flag when it applies, a "Why?" list of the facts it rested on (with what they replaced), how long it took, and "Did it work out?" buttons that feed the learning loop. A "Current context" panel lists what is believed today, with quick actions.
 - **Memory** is a timeline per slot. The time-travel slider (with step buttons) calls the same `get_fact_at` the agent uses, so dragging it back before a change shows the older belief; slots that differ from today are highlighted.
 - **Graph** draws facts, replaced-by arrows, "follows from" arrows and decisions. Pick a decision (or "See how I decided" on any card) to dim everything except what it rested on and print its audit trail, including facts that are no longer true.
 - **People** shows each friend's status (and whether it is hearsay), recent events, open promises, and the values you have stated.
-- **Demo story** plays a 14-day example in a separate blank memory, so yours is untouched. **Start fresh** erases your own. Time passes when you press **Next day**.
+- **Start fresh** erases your own memory. Time passes when you press **Next day**.
 
 It is a skin, not part of the engine: it only calls the guarded reads in `agent/tools.py` plus two read-only inspection helpers for the graph view (`store.raw_edges`, `tools.recent_decisions`), and writes only through the agent. `tests/test_ui.py` drives it end to end on the real database.
 

@@ -61,6 +61,7 @@
   .hero h1 em { font-style: italic; color: var(--terra); }
   .hero p.sub { font-size: 19px; color: var(--muted); max-width: 540px; margin: 0 0 30px; }
   .cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .cta a.learn { color: var(--ink); text-decoration: none; font-weight: 500; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
   .fine { margin-top: 18px; color: var(--muted); font-size: 14px; }
   /* hero art: layered frosted panels with live-looking belief chips */
   .art { position: relative; height: 470px; border-radius: 24px; background: linear-gradient(160deg, var(--sand-bg), var(--bg)); overflow: hidden; border: 1px solid var(--line); }
@@ -303,7 +304,7 @@
       <span class="eyebrow">A decision partner whose memory stays current</span>
       <h1>Stop taking advice from the person you <em>used to be.</em></h1>
       <p class="sub">Decisive remembers your life, forgets nothing, and acts only on what is true today. When you change your mind, it changes with you, and every answer comes with the receipts.</p>
-      <div class="cta"><button class="dark big js-example">Try the demo →</button><button class="big js-start">Start with a blank memory</button></div>
+      <div class="cta"><button class="dark big js-start">Try it now →</button><a class="learn" href="#how">See how it works</a></div>
       <p class="fine">Starts empty and private to you. Nothing to sign up for.</p>
     </div>
     <div class="art" aria-hidden="true">
@@ -396,7 +397,7 @@
   <div class="band">
     <h2>Start with a blank memory.</h2>
     <p>It takes ten seconds, nothing to sign up for. Tell it one thing about you and watch it use it.</p>
-    <div class="cta"><button class="light big js-start">Get started →</button><button class="line big js-example">Watch the demo first</button></div>
+    <div class="cta"><button class="light big js-start">Get started →</button></div>
   </div>
 
   <footer class="ft"><span>Built for the Graph Hacks hackathon. The memory is a FalkorDB graph. Everything runs on this computer.</span><span>Photos from Unsplash, used under the Unsplash License.</span></footer>
@@ -411,7 +412,6 @@
       <button data-view="memory"><span class="i">▤</span>Memory</button>
       <button data-view="graph"><span class="i">⌬</span>Graph</button>
       <button data-view="people"><span class="i">☺</span>People</button>
-      <button data-view="story"><span class="i">▷</span>Demo story</button>
     </nav>
     <h6>Recent decisions</h6>
     <div class="recent" id="recent"></div>
@@ -424,7 +424,6 @@
       <span class="sp"></span>
       <span class="daypill" title="This prototype keeps its own calendar. Press Next day to let a day pass.">Today: day <b id="today">1</b></span>
       <button id="next">Next day</button>
-      <button id="play" class="dark">▶ Play demo story</button>
       <button id="reset" class="ghost">Start fresh</button>
     </div>
 
@@ -493,26 +492,6 @@
         <div id="people"></div>
       </div>
 
-      <!-- story -->
-      <div class="view" id="view-story" hidden>
-        <div class="story">
-          <div class="l">
-            <span class="eyebrow">A walkthrough</span>
-            <h1>A life in fourteen days.</h1>
-            <p>Watch a short story unfold: a diet changes, a mistake is made and corrected, a friend lets someone down. See how the memory changes and how the agent decides, step by step.</p>
-            <div><button id="story-play" class="dark big">▶ Play demo story</button></div>
-            <p class="hint" style="margin-top:14px">It runs in a separate, blank memory. Yours is untouched.</p>
-          </div>
-          <div class="ph" role="img" aria-label="An open notebook with a pen and a cup of coffee on a wooden desk"></div>
-          <ol>
-            <li><b>Day 1</b><span>You say you eat meat and love fried chicken and paneer wrap.</span></li>
-            <li><b>Day 10</b><span>You turn vegetarian. The old fact becomes history.</span></li>
-            <li><b>Day 12</b><span>You mention you hate paneer wrap, which turns out to be a mistake.</span></li>
-            <li><b>Day 14</b><span>You correct it. The wrong fact and everything built on it is dropped.</span></li>
-            <li><b>Then</b><span>The agent helps you decide what to eat, and what to do about a friend who cancelled again.</span></li>
-          </ol>
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -564,7 +543,7 @@ async function api(path, body) {
 const U = () => encodeURIComponent(S.user);
 
 // ---- landing <-> app, and the app's pages -------------------------------------------------
-const VIEWS = ["chat", "memory", "graph", "people", "story"];
+const VIEWS = ["chat", "memory", "graph", "people"];
 function showView(name) {
   S.view = name;
   VIEWS.forEach((v) => { $("#view-" + v).hidden = v !== name; });
@@ -665,16 +644,10 @@ async function send(text, opts) {
 }
 
 function welcome() {
-  const starter = (title, sub, lines) => h("div", { class: "starter" }, h("h4", {}, title, h("span", {}, sub)),
-    h("div", { class: "chips" }, lines.map((t) => h("button", { class: "chip", type: "button", onclick: () => send(t) }, t))));
   $("#log").append(h("div", { class: "msg welcome" },
     h("h2", {}, "Hi, I'm your decision partner."),
-    h("p", {}, "My memory of you is empty, so let's start. Say anything in plain words, or tap a suggestion."),
-    h("div", { class: "starters" },
-      starter("1. Tell me about you", "each tap teaches me something", ["I eat meat again", "I love fried chicken", "I hate paneer wrap"]),
-      starter("2. Ask me to choose", "I only use what is true now", ["fried chicken or chana chaat?"]),
-      starter("3. Change something", "and watch my answer change", ["I turned vegetarian", "fried chicken or chana chaat?", "that was wrong about paneer wrap"]),
-      starter("Or ask about a friend", "advice with judgment", ["my friend Sam cancelled again, should I say something?"]))));
+    h("p", {}, "My memory of you is empty, so let's start. Tell me about yourself in your own words, or ask me to choose between two things."),
+    h("p", { class: "hint" }, "For example: \"I eat meat\", \"I love samosa\", \"I'm trying to cut sugar\", \"my friend Sam cancelled again\", or \"pasta or sprouts?\".")));
 }
 
 // ---- refresh ----------------------------------------------------------------------------
@@ -919,30 +892,7 @@ $("#qa-explain").addEventListener("click", () => {
 });
 $("#home").addEventListener("click", showLanding);
 
-const STORY = ["I eat meat again", "I love fried chicken", "I love paneer wrap", "fried chicken or chana chaat?", "/day 10",
-               "I turned vegetarian", "fried chicken or chana chaat?", "/why", "/day 12", "I hate paneer wrap",
-               "paneer wrap or chana chaat?", "/day 14", "that was wrong about paneer wrap", "paneer wrap or chana chaat?",
-               "my friend Priya cancelled again, should I say something?"];
-async function playExample() {
-  if (S.playing) { S.playing = false; return; }
-  S.playing = true; $("#play").textContent = "■ Stop";
-  try {
-    await startFresh(false);                      // a new blank memory; nothing of yours is touched
-    note("Playing the demo story in a separate, blank memory. Press Start fresh when you want your own.");
-    for (const line of STORY) {
-      if (!S.playing) break;
-      await send(line, line.startsWith("/day") ? { quiet: true } : undefined);
-      await new Promise((r) => setTimeout(r, 1300));
-    }
-    if (S.playing) note("That was the story. Open Memory and drag the time-travel slider, or open Graph and pick a decision to see what it rested on.");
-  } catch (e) { addMsg("bot err", "Error: " + e.message); }
-  S.playing = false; $("#play").textContent = "▶ Play demo story";
-}
-$("#play").addEventListener("click", playExample);
-$("#story-play").addEventListener("click", playExample);
-
 document.querySelectorAll(".js-start").forEach((b) => b.addEventListener("click", () => showApp("chat")));
-document.querySelectorAll(".js-example").forEach((b) => b.addEventListener("click", () => { showApp("chat"); playExample(); }));
 
 // start: a returning tab goes straight to the app, a new visitor sees the landing page first
 setId(S.user);
