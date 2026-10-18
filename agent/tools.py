@@ -126,15 +126,29 @@ def related_facts(user, key, hops=2, day=0):
     return {k: (v, i) for k, v, i in rows}
 
 
+def recent_decisions(user, n=40):
+    """The last n decisions, oldest first, each with the ids of the facts it USED (for the UI)."""
+    rows = get_graph(user).query(
+        "MATCH (d:Decision) OPTIONAL MATCH (d)-[:USED]->(f:Fact) "
+        "RETURN d.id, d.day, d.pick, d.mode, d.options, d.contact, collect(f.id) "
+        "ORDER BY d.day DESC, d.id DESC LIMIT $n", {"n": n},
+    ).result_set
+    out = [{"id": i, "day": day, "pick": pick, "mode": mode, "options": json.loads(opts or "[]"),
+            "contact": contact, "used": [u for u in used if u is not None]}
+           for i, day, pick, mode, opts, contact, used in rows]
+    return out[::-1]
+
+
 def explain_decision(user, decision_id):
     """The audit trail: what the answer rested on, each fact's history, and the graph path."""
     g = get_graph(user)
     rows = g.query(
-        "MATCH (d:Decision {id:$d}) RETURN d.pick, d.day, d.mode, d.options", {"d": decision_id}
+        "MATCH (d:Decision {id:$d}) RETURN d.pick, d.day, d.mode, d.options, d.rules, d.contact",
+        {"d": decision_id}
     ).result_set
     if not rows:
         return None
-    pick, day, mode, options = rows[0]
+    pick, day, mode, options, rules, contact = rows[0]
     used = g.query(
         "MATCH (d:Decision {id:$d})-[:USED]->(f:Fact) RETURN f.key, f.value, f.id ORDER BY f.seq",
         {"d": decision_id},
@@ -144,8 +158,13 @@ def explain_decision(user, decision_id):
         "WITH shortestPath((p)-[*..4]->(d)) AS x RETURN length(x)",
         {"d": decision_id},
     ).result_set
+    values_applied = g.query(
+        "MATCH (d:Decision {id:$d})-[:APPLIED]->(v:Value) RETURN v.tag ORDER BY v.id",
+        {"d": decision_id}).result_set
     return {
         "decision_id": decision_id, "pick": pick, "day": day, "mode": mode, "options": options,
+        "rules": json.loads(rules or "[]"), "contact": contact,
+        "values_applied": [r[0] for r in values_applied],
         "used": [{"key": k, "value": v, "id": i, "history": fact_history(user, k)}
                  for k, v, i in used],
         "path_length": plen[0][0] if plen and plen[0][0] is not None else None,
@@ -243,6 +262,42 @@ def rank_contacts(user):
     return {i: s for i, s in rows}
 
 
+def pending_handoffs(user, agent):
+    """Open handoffs addressed to this agent (or to "any"), oldest first."""
+    rows = get_graph(user).query(
+        "MATCH (h:Handoff {status:'open'}) WHERE h.to_agent=$a OR h.to_agent='any' "
+        "RETURN h.id, h.from_agent, h.task, h.payload, h.created ORDER BY h.created, h.id",
+        {"a": agent},
+    ).result_set
+    return [{"id": i, "from": f, "task": t, "payload": json.loads(p or "{}"), "created": c}
+            for i, f, t, p, c in rows]
+
+
+def list_handoffs(user):
+    """Every handoff for this person with its status, oldest first."""
+    rows = get_graph(user).query(
+        "MATCH (h:Handoff) RETURN h.id, h.from_agent, h.to_agent, h.task, h.status, h.claimed_by "
+        "ORDER BY h.created, h.id").result_set
+    return [{"id": i, "from": f, "to": t, "task": task, "status": s, "claimed_by": c}
+            for i, f, t, task, s, c in rows]
+
+
+def get_handoff(user, hid):
+    """Everything about one handoff, including the decision it led to, or None."""
+    g = get_graph(user)
+    rows = g.query(
+        "MATCH (h:Handoff {id:$h}) OPTIONAL MATCH (h)-[:RESULTED_IN]->(d:Decision) "
+        "RETURN h.from_agent, h.to_agent, h.task, h.payload, h.status, h.claimed_by, h.result, "
+        "h.created, h.completed, d.id", {"h": hid},
+    ).result_set
+    if not rows:
+        return None
+    f, t, task, pl, st, by, res, created, done, did = rows[0]
+    return {"id": hid, "from": f, "to": t, "task": task, "payload": json.loads(pl or "{}"),
+            "status": st, "claimed_by": by, "result": json.loads(res) if res else None,
+            "created": created, "completed": done, "decision_id": did}
+
+
 def get_weights(user):
     """Procedural memory: rule -> this user's learned multiplier (absent means 1.0)."""
     rows = get_graph(user).query("MATCH (w:Weight) RETURN w.rule, w.mult").result_set
@@ -262,13 +317,14 @@ def weight_history(user, rule):
 
 def get_decision(user, decision_id):
     rows = get_graph(user).query(
-        "MATCH (d:Decision {id:$d}) RETURN d.pick, d.day, d.options, d.features, d.scores, d.rules",
+        "MATCH (d:Decision {id:$d}) RETURN d.pick, d.day, d.options, d.features, d.scores, d.rules, "
+        "d.mode, d.contact",
         {"d": decision_id},
     ).result_set
     if not rows:
         return None
-    pick, day, options, features, scores, rules = rows[0]
-    return {"id": decision_id, "pick": pick, "day": day,
+    pick, day, options, features, scores, rules, mode, contact = rows[0]
+    return {"id": decision_id, "pick": pick, "day": day, "mode": mode, "contact": contact,
             "options": json.loads(options or "[]"), "features": json.loads(features or "{}"),
             "scores": json.loads(scores or "{}"), "rules": json.loads(rules or "[]")}
 
@@ -288,17 +344,18 @@ def record_outcome(user, decision_id, result, day, note=""):
     if result not in ("good", "mixed", "bad"):
         raise ValueError("result must be good, mixed or bad")
     g = get_graph(user)
-    if get_decision(user, decision_id) is None:
-        raise KeyError(f"no decision {decision_id}")
-    if g.query("MATCH (d:Decision {id:$d})-[:LED_TO]->(o:Outcome) RETURN o.id",
-               {"d": decision_id}).result_set:
-        raise ValueError(f"{decision_id} already has an outcome")
-    oid = store.new_id(user, "o")
-    g.query(
-        "MATCH (d:Decision {id:$d}) "
-        "CREATE (o:Outcome {id:$o, result:$r, day:$day, note:$n}) CREATE (d)-[:LED_TO]->(o)",
-        {"d": decision_id, "o": oid, "r": result, "day": day, "n": note},
-    )
+    with store.user_lock(user):  # check-then-create: two raters must not both succeed
+        if get_decision(user, decision_id) is None:
+            raise KeyError(f"no decision {decision_id}")
+        if g.query("MATCH (d:Decision {id:$d})-[:LED_TO]->(o:Outcome) RETURN o.id",
+                   {"d": decision_id}).result_set:
+            raise ValueError(f"{decision_id} already has an outcome")
+        oid = store.new_id(user, "o")
+        g.query(
+            "MATCH (d:Decision {id:$d}) "
+            "CREATE (o:Outcome {id:$o, result:$r, day:$day, note:$n}) CREATE (d)-[:LED_TO]->(o)",
+            {"d": decision_id, "o": oid, "r": result, "day": day, "n": note},
+        )
     return oid
 
 

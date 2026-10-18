@@ -26,11 +26,13 @@ def _arm_result(user, day, options, arm, statuses):
     return res, stale
 
 
-def _ask(user, step):
+def _ask(user, step, observer=None):
     day, names = step["day"], list(step["options"])
     if step["add_skip"]:
         names.append("skip")
     options = decide.resolve(names)
+    if observer:  # lets another evaluation look at the world just before the agent answers
+        observer(user, step, options)
     statuses = _statuses(user)
     active_keys = {r["key"] for r in store.raw_facts(user) if r["status"] == "active"}
 
@@ -62,7 +64,7 @@ def _ask(user, step):
     }
 
 
-def replay(user, steps):
+def replay(user, steps, observer=None):
     store.reset(user)
     out = {"asks": [], "cascade": [], "time_travel": []}
     promises = {}
@@ -90,7 +92,7 @@ def replay(user, steps):
         elif op == "promise_mark":
             store.mark_promise(user, promises[s["alias"]], s["status"], day)
         elif op == "ask":
-            out["asks"].append(_ask(user, s))
+            out["asks"].append(_ask(user, s, observer))
         elif op == "time_travel":
             got = tools.get_fact_at(user, s["key"], s["as_of"])
             out["time_travel"].append({"id": s["id"], "key": s["key"], "as_of": s["as_of"],

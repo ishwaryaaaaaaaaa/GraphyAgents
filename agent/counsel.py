@@ -21,7 +21,7 @@ judge a character from one message. Signs of danger or crisis stop the normal fl
 import json
 import re
 
-from agent import llm, tools
+from agent import llm, schema, tools
 
 OPTIONS = ("talk", "wait", "let_it_go")
 PATTERN_DAYS, PATTERN_MIN, FRESH_DAYS = 30, 3, 1
@@ -42,8 +42,7 @@ VALUE_LEAN = {
     "self_respect": {"talk": 1.0},
     "loyalty": {"talk": 1.0, "let_it_go": 1.0},
 }
-VALUE_WORDS = {"honesty": "honesty", "show_up": "showing up", "peace": "peace",
-               "self_respect": "self-respect", "loyalty": "loyalty"}
+VALUE_WORDS = schema.VALUE_WORDS
 KIND_WORDS = {"cancel": "cancelled", "ghosted": "gone quiet", "argument": "argued",
               "apology": "apologised", "favor": "helped you", "celebration": "celebrated",
               "plan": "made plans", "made_up": "made up"}
@@ -54,7 +53,7 @@ _UNSET = object()
 
 _CRISIS = re.compile(
     r"\b(kill myself|killing myself|end my life|suicid\w*|want to die|hurt myself|harm myself|"
-    r"self[- ]harm|(he|she|they|my \w+) (hits|hit|beats|beat|threatens|threatened) me|"
+    r"self[- ]harm|(he|she|they|my \w+) (hits|hit|beats|beat|threatens|threatened) me(?! up\b)|"
     r"(am|feel) not safe|afraid for my life|being abused|abus(es|ed|ing) me|kill (him|her|them))\b",
     re.I)
 
@@ -162,7 +161,9 @@ def fire(brief):
 
 
 def score(brief, principles):
-    scores = {o: TIE_ORDER.get(o, 0.0) for o in brief["options"]}
+    """Raw lean totals per option. Tie-break order is applied only when ranking, so it can
+    never make a lead look bigger or smaller than it is."""
+    scores = {o: 0.0 for o in brief["options"]}
     for p in principles:
         for o, w in p["lean"].items():
             if o in scores:
@@ -172,7 +173,7 @@ def score(brief, principles):
 
 def verdict_of(brief, scores):
     """(verdict, confidence). A small lead is humility: the choice is the user's."""
-    ranked = sorted(scores, key=lambda o: -scores[o])
+    ranked = sorted(scores, key=lambda o: -(scores[o] + TIE_ORDER.get(o, 0.0)))
     margin = scores[ranked[0]] - scores[ranked[1]] if len(ranked) > 1 else 99.0
     confidence = "high" if margin >= 3 else "medium" if margin >= 1.5 else "low"
     if margin < HUMILITY_MARGIN and "cut_off" not in brief["options"]:
@@ -266,13 +267,33 @@ def brief_days(brief):
     return days
 
 
+_STARTERS = frozenset("""A About After Again All Also An And Any Are As Ask At Because Before But By
+Can Consider Cutting Do Does Don Either Even Every First For From Given Going Good Had Has Have He Hey
+Her Here His Honestly How If In Instead Is It Its Just Keep Last Later Let Maybe More My Never No Not
+Nothing Now Of On Once One Only Or Our Pick Please Quite Rather Remember Say See Send She Since Sleep So
+Some Something Sometimes Start Still Take Talk Tell Than That The Their Then There These They Things
+This Those Though Today Tomorrow Try Two Until Wait We Well What When Whether Which While Who Why Will
+With Without Would Yes Yet You Your""".split())
+
+
+def _unknown_names(text, brief):
+    """Capitalised words that are neither ordinary sentence starters nor anything in the brief:
+    a possible invented person. Conservative on purpose: a false alarm only means the template
+    is used instead of the model's wording."""
+    known = set(re.findall(r"\b[A-Z][a-z]+\b", json.dumps(
+        {k: v for k, v in brief.items() if k != "_user"}, default=str)))
+    return [w for w in re.findall(r"\b[A-Z][a-z]+\b", text) if w not in _STARTERS and w not in known]
+
+
 def grounded(text, brief, verdict=None):
     """True only if every person, day, event and status in the text exists in the brief,
-    nothing diagnoses anyone, and the verdict comes first."""
+    nothing diagnoses anyone, and the verdict is in the first sentence."""
     low = text.lower()
     if _BANNED.search(low):
         return False
-    if verdict and _VERDICT_MARK[verdict] not in low[:90]:
+    if verdict and _VERDICT_MARK[verdict] not in re.split(r"[.!?]", low, maxsplit=1)[0]:
+        return False
+    if _unknown_names(text, brief):
         return False
     allowed_days = brief_days(brief)
     for group in re.findall(r"\bdays? (\d+(?:(?:, | and |, and )\d+)*)", low):

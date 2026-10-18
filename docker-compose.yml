@@ -1,8 +1,11 @@
 # One command from a clean clone:  docker compose up --build --abort-on-container-exit
 # Starts FalkorDB (Browser on http://localhost:3000), then runs both evaluations against it.
+#
+# The website (landing page plus app), with its own database that keeps memories across restarts:
+#   docker compose up --build web                # then open http://localhost:8765
 services:
   falkordb:
-    image: falkordb/falkordb:latest
+    image: falkordb/falkordb:v4.22.1-alpine   # the version all reported results were produced on
     ports:
       - "6379:6379"   # database
       - "3000:3000"   # FalkorDB Browser: see the graph
@@ -25,3 +28,39 @@ services:
       - ./results:/app/results
     command: >
       sh -c "pytest -q && python run_eval.py --set meera && python run_eval.py --set generated --seeds 300-499"
+
+  # ---- the website. Only started when named:  docker compose up --build web ----
+  web-db:
+    profiles: ["web"]
+    image: falkordb/falkordb:v4.22.1-alpine
+    volumes:
+      - web-db-data:/var/lib/falkordb/data      # memories survive restarts
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    profiles: ["web"]
+    build: .
+    depends_on:
+      web-db:
+        condition: service_healthy
+    environment:
+      FALKORDB_HOST: web-db
+      FALKORDB_PORT: "6379"
+      LLM_MODE: "off"
+      UI_MAX_SESSIONS: "2000"                   # most people this server will hold at once
+    ports:
+      - "8765:8765"
+    command: ["python", "ui_server.py", "--host", "0.0.0.0", "--port", "8765"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8765/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  web-db-data:

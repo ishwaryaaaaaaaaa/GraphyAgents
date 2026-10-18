@@ -1,0 +1,26 @@
+/reset
+I eat meat again
+I love fried chicken
+I love paneer wrap
+fried chicken or chana chaat?
+/day 10
+I turned vegetarian
+fried chicken or chana chaat?
+/why
+/day 12
+I hate paneer wrap
+paneer wrap or chana chaat?
+/day 14
+that was wrong about paneer wrap
+paneer wrap or chana chaat?
+/history diet_style
+/at diet_style 8
+my friend Priya cancelled again, should I say something?
+/day 20
+Priya cancelled
+/day 27
+Priya cancelled
+/day 33
+Priya cancelled on me again, should I say something?
+/why
+/quit

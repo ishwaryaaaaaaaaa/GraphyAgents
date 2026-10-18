@@ -36,6 +36,59 @@ def run_learning():
     return md, results
 
 
+def run_concurrency():
+    import json as _json
+    from eval import concurrency
+    res = concurrency.run()
+    md = "### Track 2 stress test: concurrency\n\n" + concurrency.to_markdown(res)
+    report.RESULTS.mkdir(exist_ok=True)
+    (report.RESULTS / "concurrency.md").write_text(md, encoding="utf-8")
+    (report.RESULTS / "concurrency.json").write_text(_json.dumps(res, indent=2, default=str),
+                                                     encoding="utf-8")
+    return md, res
+
+
+def run_scorer():
+    import json as _json
+    from eval import scorer_eval
+    res, info = scorer_eval.run()
+    md = ("### Trained scorer vs rules, by memory read\n\n" + scorer_eval.to_markdown(res, info))
+    report.RESULTS.mkdir(exist_ok=True)
+    (report.RESULTS / "scorer.md").write_text(md, encoding="utf-8")
+    (report.RESULTS / "scorer.json").write_text(_json.dumps({"results": res, "model": info}, indent=2),
+                                                encoding="utf-8")
+    return md, res
+
+
+def run_social(seeds):
+    import json as _json
+    from data import social_generator
+    from eval import social
+    runs, bad = [], []
+    for seed in seeds:
+        life = social_generator.generate(seed)
+        user = f"soc{seed}"
+        try:
+            run = social.replay(user, life)
+        finally:
+            store.reset(user)
+        runs.append(run)
+        for a in run:
+            g = a["arms"]["guarded"]
+            if not (g["verdict_ok"] and g["principles_ok"]):
+                bad.append({"seed": seed, "id": a["id"], "day": a["day"], "contact": a["contact"],
+                            "oracle": [a["expect_verdict"], a["expect_principles"]],
+                            "agent": [g["verdict"], g["principles"]]})
+    summary = social.summarise(runs)
+    md = (f"### Advice about people, seeds {seeds.start}-{seeds[-1]}\n\n"
+          + social.to_markdown(summary))
+    report.RESULTS.mkdir(exist_ok=True)
+    (report.RESULTS / "social.md").write_text(md, encoding="utf-8")
+    (report.RESULTS / "social_disagreements.json").write_text(_json.dumps(bad, indent=2),
+                                                              encoding="utf-8")
+    return md + f"\nDisagreements with the oracle: {len(bad)}\n", summary
+
+
 def parse_seeds(text):
     lo, _, hi = text.partition("-")
     return range(int(lo), int(hi or lo) + 1)
@@ -75,20 +128,29 @@ def run_generated(seeds, quiet=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", choices=["meera", "generated", "learning"], default="meera")
-    ap.add_argument("--seeds", default="300-499", help="range for --set generated, e.g. 300-499")
+    ap.add_argument("--set", choices=["meera", "generated", "learning", "social", "scorer",
+                                      "concurrency"], default="meera")
+    ap.add_argument("--seeds", default=None,
+                    help="range, e.g. 300-499 for --set generated (default), 2000-2199 for social")
     args = ap.parse_args(argv)
     if args.set == "meera":
         md, summary = run_meera()
     elif args.set == "learning":
         md, summary = run_learning()
+    elif args.set == "scorer":
+        md, summary = run_scorer()
+    elif args.set == "concurrency":
+        md, summary = run_concurrency()
+    elif args.set == "social":
+        md, summary = run_social(parse_seeds(args.seeds or "2000-2199"))
     else:
-        md, summary = run_generated(parse_seeds(args.seeds))
+        md, summary = run_generated(parse_seeds(args.seeds or "300-499"))
     print(md)
     return summary
 
 
 if __name__ == "__main__":
     s = main()
-    ok = isinstance(s, list) or s["arms"]["guarded"]["stale_use"]["k"] == 0
+    ok = isinstance(s, list) or "arms" not in s or "stale_use" not in next(iter(s["arms"].values())) \
+        or s["arms"]["guarded"]["stale_use"]["k"] == 0
     sys.exit(0 if ok else 1)

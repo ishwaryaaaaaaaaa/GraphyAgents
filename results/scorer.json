@@ -1,0 +1,277 @@
+{
+  "results": {
+    "questions": 3595,
+    "arms": {
+      "guarded/rules": {
+        "k": 3595,
+        "n": 3595,
+        "pct": 100.0,
+        "ci": [
+          99.9,
+          100.0
+        ]
+      },
+      "guarded/scorer": {
+        "k": 3580,
+        "n": 3595,
+        "pct": 99.6,
+        "ci": [
+          99.3,
+          99.7
+        ]
+      },
+      "first_write/rules": {
+        "k": 1857,
+        "n": 3595,
+        "pct": 51.7,
+        "ci": [
+          50.0,
+          53.3
+        ]
+      },
+      "first_write/scorer": {
+        "k": 1861,
+        "n": 3595,
+        "pct": 51.8,
+        "ci": [
+          50.1,
+          53.4
+        ]
+      },
+      "last_write_wins/rules": {
+        "k": 2828,
+        "n": 3595,
+        "pct": 78.7,
+        "ci": [
+          77.3,
+          80.0
+        ]
+      },
+      "last_write_wins/scorer": {
+        "k": 2820,
+        "n": 3595,
+        "pct": 78.4,
+        "ci": [
+          77.1,
+          79.8
+        ]
+      }
+    },
+    "slices": {
+      "all questions": {
+        "guarded/rules": {
+          "k": 3595,
+          "n": 3595,
+          "pct": 100.0,
+          "ci": [
+            99.9,
+            100.0
+          ]
+        },
+        "guarded/scorer": {
+          "k": 3580,
+          "n": 3595,
+          "pct": 99.6,
+          "ci": [
+            99.3,
+            99.7
+          ]
+        },
+        "first_write/scorer": {
+          "k": 1861,
+          "n": 3595,
+          "pct": 51.8,
+          "ci": [
+            50.1,
+            53.4
+          ]
+        }
+      },
+      "stale-memory traps": {
+        "guarded/rules": {
+          "k": 1737,
+          "n": 1737,
+          "pct": 100.0,
+          "ci": [
+            99.8,
+            100.0
+          ]
+        },
+        "guarded/scorer": {
+          "k": 1729,
+          "n": 1737,
+          "pct": 99.5,
+          "ci": [
+            99.1,
+            99.8
+          ]
+        },
+        "first_write/scorer": {
+          "k": 9,
+          "n": 1737,
+          "pct": 0.5,
+          "ci": [
+            0.3,
+            1.0
+          ]
+        }
+      },
+      "no trap": {
+        "guarded/rules": {
+          "k": 1858,
+          "n": 1858,
+          "pct": 100.0,
+          "ci": [
+            99.8,
+            100.0
+          ]
+        },
+        "guarded/scorer": {
+          "k": 1851,
+          "n": 1858,
+          "pct": 99.6,
+          "ci": [
+            99.2,
+            99.8
+          ]
+        },
+        "first_write/scorer": {
+          "k": 1852,
+          "n": 1858,
+          "pct": 99.7,
+          "ci": [
+            99.3,
+            99.9
+          ]
+        }
+      },
+      "involve a held-out food": {
+        "guarded/rules": {
+          "k": 1790,
+          "n": 1790,
+          "pct": 100.0,
+          "ci": [
+            99.8,
+            100.0
+          ]
+        },
+        "guarded/scorer": {
+          "k": 1778,
+          "n": 1790,
+          "pct": 99.3,
+          "ci": [
+            98.8,
+            99.6
+          ]
+        },
+        "first_write/scorer": {
+          "k": 872,
+          "n": 1790,
+          "pct": 48.7,
+          "ci": [
+            46.4,
+            51.0
+          ]
+        }
+      },
+      "only foods seen in training": {
+        "guarded/rules": {
+          "k": 1805,
+          "n": 1805,
+          "pct": 100.0,
+          "ci": [
+            99.8,
+            100.0
+          ]
+        },
+        "guarded/scorer": {
+          "k": 1802,
+          "n": 1805,
+          "pct": 99.8,
+          "ci": [
+            99.5,
+            99.9
+          ]
+        },
+        "first_write/scorer": {
+          "k": 989,
+          "n": 1805,
+          "pct": 54.8,
+          "ci": [
+            52.5,
+            57.1
+          ]
+        }
+      }
+    },
+    "chosen": "pairwise",
+    "models_compared": {
+      "pairwise": {
+        "k": 3580,
+        "n": 3595,
+        "pct": 99.6,
+        "ci": [
+          99.3,
+          99.7
+        ]
+      },
+      "logistic": {
+        "k": 3311,
+        "n": 3595,
+        "pct": 92.1,
+        "ci": [
+          91.2,
+          92.9
+        ]
+      },
+      "boosting": {
+        "k": 3289,
+        "n": 3595,
+        "pct": 91.5,
+        "ci": [
+          90.5,
+          92.4
+        ]
+      }
+    },
+    "scorer_vs_rules": {
+      "differ": 15,
+      "scorer_right_rules_wrong": 0,
+      "rules_right_scorer_wrong": 15,
+      "both_wrong_differently": 0
+    }
+  },
+  "model": {
+    "kind": "pairwise",
+    "validation": {
+      "pairwise": 0.9966517857142857,
+      "logistic": 0.9296875,
+      "boosting": 0.9229910714285714
+    },
+    "train_questions": 5243,
+    "train_rows": 10694,
+    "val_questions": 896,
+    "weights": {
+      "rule_promise": 12.435006832709343,
+      "rule_sugar_earned": 10.932728531155108,
+      "rule_fried_goal": -10.655684289026196,
+      "rule_likes": 10.648513419481512,
+      "fried_goal_x_rank": -7.408044535052683,
+      "sugar_streak": 7.247291933797356,
+      "list_position": -6.522849232552436,
+      "goal_rank": 3.5812323598559526,
+      "rule_healthy": 3.075245232010738,
+      "tag_healthy": 3.075245232010738,
+      "is_skip": -2.0020068290640634,
+      "tag_dessert": 0.6046713778359407,
+      "tag_snack": 0.5351475123137405,
+      "tag_meal": 0.47318308881208426,
+      "is_activity": 0.3890048501022928,
+      "tag_meat": 0.33513446104302286,
+      "tag_sugar": 0.19242617134806542,
+      "tag_fried": 0.14681562672737775,
+      "n_options": 0.0
+    },
+    "weights_of": "pairwise"
+  }
+}

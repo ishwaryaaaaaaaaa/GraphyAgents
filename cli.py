@@ -12,9 +12,12 @@ import difflib
 import re
 import sys
 
-from agent import decide, explain, extract, learn, store, tools
+from agent import counsel, decide, explain, extract, learn, social, store, tools
 
 HELP = """tell me things, or ask a fork:  'dessert or skip?'  'can I have ice cream?'
+people:  'my friend Priya cancelled again, should I say something?'  'Priya and I made up'
+         'I want to be someone who shows up'   /people   /values
+         I weigh your history, your values and how earlier advice went; the choice stays yours.
 /outcome good|mixed|bad [id]   how my advice went: I learn what matters to YOU from bad ones
 /weights [rule]  what I have learned about you   /next  next day      /day N  jump to day N
 /facts           what is true now             /history K  every value a slot has held
@@ -63,9 +66,10 @@ def parse_fork(line):
 
 
 class Session:
-    def __init__(self, user="you", day=1, auto=False):
-        self.user, self.day, self.auto = user, day, auto
+    def __init__(self, user="you", day=1, auto=False, mode="rules"):
+        self.user, self.day, self.auto, self.mode = user, day, auto, mode
         self.pending = []
+        self.asked = set()
         self.last_decision = None
         store.ensure_user(user)
 
@@ -74,15 +78,18 @@ class Session:
         return "Done: " + "; ".join(extract.apply_ops(self.user, ops, self.day)) + "."
 
     def _ask(self, names, add_skip):
-        res = decide.decide(self.user, self.day, names, add_skip=add_skip)
+        res = decide.decide(self.user, self.day, names, add_skip=add_skip, mode=self.mode)
         self.last_decision = res
         return explain.explain(self.user, res) + f"   [{res['decision_id']}: /why]"
 
     def _pending_note(self):
-        pending = tools.pending_outcomes(self.user, self.day)
+        """Ask how a decision went, once per decision (not on every day jump)."""
+        pending = [d for d in tools.pending_outcomes(self.user, self.day)
+                   if d["id"] not in self.asked]
         if not pending:
             return ""
         d = pending[-1]
+        self.asked.update(p["id"] for p in pending)
         more = f" (+{len(pending) - 1} earlier)" if len(pending) > 1 else ""
         return (f"\nHow did {d['id']} go ({d['pick'].replace('_', ' ')}, day {d['day']})?{more} "
                 f"/outcome good|mixed|bad {d['id']}")
@@ -100,6 +107,10 @@ class Session:
             res = learn.apply_outcome(self.user, did, args[0], self.day)
         except (KeyError, ValueError) as e:
             return f"Can't record that: {e.args[0]}"
+        dec = tools.get_decision(self.user, did)
+        if dec and dec["mode"] == "counsel":
+            return (f"Noted {did} as {args[0]} ({res['outcome_id']}). I'll remember how this went "
+                    f"with {dec['contact'].title()} next time.")
         if not res["changes"]:
             why = "nothing to change" if args[0] != "bad" else "no rule separated my pick from the other option"
             return f"Noted {did} as {args[0]} ({res['outcome_id']}): {why}."
@@ -119,8 +130,52 @@ class Session:
         return "\n".join(f"{r:13} x{w.get(r, 1.0):.2f}" + ("" if r in w else "  (default)")
                          for r in decide.LEARNABLE)
 
+    def _contact_names(self):
+        return [c["name"] for c in tools.list_contacts(self.user)]
+
+    def _counsel(self, sit):
+        """Advice about a person. Facts stated in the same sentence ('Priya cancelled again')
+        are recorded first, because the user told us them while asking."""
+        notes = []
+        if sit["intro"]:
+            name, rel = sit["intro"]
+            notes += extract.apply_ops(self.user, [
+                {"op": "add_contact", "name": name, "relation": rel, "confidence": 1.0,
+                 "days_ago": 0}], self.day)
+        got = extract.extract(sit["text"], self.day, contacts=self._contact_names())
+        stated = [o for o in got["ops"] if o["op"] in ("log_interaction", "set_fact")
+                  and (o["op"] == "log_interaction" or o["key"].startswith("contact:"))]
+        notes += extract.apply_ops(self.user, stated, self.day)
+        cid = store.contact_id(sit["contact"])
+        if not tools.get_contact(self.user, cid):
+            return f"I don't know {sit['contact']} yet. Try: 'my friend {sit['contact']} ...'"
+        res = counsel.counsel(self.user, cid, self.day, kind=sit["kind"], options=sit["options"])
+        self.last_decision = {"decision_id": res["decision_id"], "pick": res["verdict"]}
+        head = f"(noted: {'; '.join(notes)})\n" if notes else ""
+        head = head.replace("noted: noted", "noted")
+        return (f"{head}{res['text']}\n[{res['decision_id']}: confidence {res['confidence']}; "
+                f"/why, then /outcome good|mixed|bad later]")
+
+    def _people(self):
+        contacts = tools.list_contacts(self.user)
+        if not contacts:
+            return "(nobody yet: tell me about someone, e.g. 'my friend Priya cancelled again')"
+        ranks = tools.rank_contacts(self.user)
+        lines = []
+        for c in contacts:
+            st = tools.get_fact_meta(self.user, f"contact:{c['id']}:status", self.day)
+            last = tools.contact_timeline(self.user, c["id"], 1, self.day)
+            city = tools.get_fact_meta(self.user, f"contact:{c['id']}:city", self.day)
+            lines.append(f"{c['name']} ({c['relation']})"
+                         + (f", status {st['value']}" if st else "")
+                         + (f", lives in {city['value']}" if city else "")
+                         + (f", last: {last[0]['kind'].replace('_', ' ')} on day {last[0]['day']}"
+                            if last else "")
+                         + (f", centrality {ranks[c['id']]:.2f}" if c["id"] in ranks else ""))
+        return "\n".join(lines)
+
     def _tell(self, line):
-        got = extract.extract(line, self.day)
+        got = extract.extract(line, self.day, contacts=self._contact_names())
         msgs = [f"(couldn't use: {e})" for e in got["errors"]]
         if not got["ops"]:
             return "\n".join(msgs + ["I didn't find anything to remember in that."])
@@ -149,12 +204,18 @@ class Session:
         if cmd == "/day" and args and args[0].isdigit():
             self.day = int(args[0])
             return f"Day {self.day}." + self._pending_note()
+        if cmd == "/people":
+            return self._people()
+        if cmd == "/values":
+            vals = tools.values(self.user)
+            return "\n".join(f"{v['tag'].replace('_', ' ')} (since day {v['since']})"
+                             for v in vals) or "(none yet: say 'I value honesty')"
         if cmd == "/outcome":
             return self._outcome(args)
         if cmd == "/weights":
             return self._weights(args[0] if args else None)
         if cmd == "/user" and args:
-            self.__init__(args[0], self.day, self.auto)
+            self.__init__(args[0], self.day, self.auto, self.mode)
             return f"Switched to {self.user}."
         if cmd == "/reset":
             store.reset(self.user)
@@ -191,15 +252,23 @@ class Session:
             for u in audit["used"]:
                 chain = " -> ".join(f"{h['value']}[{h['status']}]" for h in u["history"])
                 lines.append(f"used {u['key']} = {u['value']}   history: {chain}")
+            if audit["mode"] == "counsel":
+                lines.append(f"advice about {audit['contact']}; principles that fired: "
+                             f"{', '.join(audit['rules']) or 'none'}"
+                             + (f"; your values applied: {', '.join(audit['values_applied'])}"
+                                if audit["values_applied"] else ""))
             if not audit["used"]:
                 lines.append("used no stored facts")
             return "\n".join(lines)
         return "Unknown command. /help"
 
     def handle(self, line):
-        line = line.strip()
+        line = line.strip().lstrip("﻿")
         if not line:
             return ""
+        if counsel.crisis_check(line):  # danger stops the normal flow, before anything else
+            self.pending = []
+            return counsel.CRISIS_MESSAGE
         if self.pending:
             ops, self.pending = self.pending, []
             if line.lower() in ("y", "yes"):
@@ -210,6 +279,13 @@ class Session:
             return "(I did not write: " + " and ".join(extract.describe(o) for o in ops) + ")\n" + reply
         if line.startswith("/") and not line.lower().startswith("/ask"):
             return self._command(line)
+        stranger = social.unknown_person(line, self._contact_names())
+        if stranger:
+            return (f"Who is {stranger}? Tell me with 'my friend {stranger} ...' so I know who "
+                    "they are.")
+        sit = social.situation(line, self._contact_names())  # people before food: a question
+        if sit:                                              # about Priya is not a fork of items
+            return self._counsel({**sit, "text": line})
         try:
             fork = parse_fork(line)
         except ValueError as e:
@@ -224,8 +300,11 @@ def main(argv=None):
     ap.add_argument("--user", default="you")
     ap.add_argument("--day", type=int, default=1)
     ap.add_argument("--yes", action="store_true", help="apply confident changes without asking")
+    ap.add_argument("--mode", choices=["rules", "scorer"], default="rules",
+                    help="rank food options with the rule table or the trained scorer "
+                         "(needs models/scorer.joblib: python run_eval.py --set scorer)")
     args = ap.parse_args(argv)
-    s = Session(args.user, args.day, args.yes)
+    s = Session(args.user, args.day, args.yes, args.mode)
     print(f"Decisive agent. User {s.user}, day {s.day}. /help for commands, /quit to leave.")
     while True:
         try:

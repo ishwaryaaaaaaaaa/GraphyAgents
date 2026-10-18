@@ -103,5 +103,43 @@ def log_event(user: str, kind: str, what: str, tag: str, day: int) -> dict:
     return {"event_id": tools.log_event(user, kind, what, tag, day)}
 
 
+# ---- coordination between agents: handoffs live in the graph ---------------------------------
+
+@mcp.tool(annotations=WRITE)
+def handoff_create(user: str, from_agent: str, to_agent: str, task: str, day: int,
+                   payload: dict | None = None) -> dict:
+    """Ask another agent (or "any") to do something for this person. The request is a Handoff node
+    in the person's graph, so every agent connected to the same graph can see it."""
+    return {"handoff_id": store.create_handoff(user, from_agent, to_agent, task, payload, day)}
+
+
+@mcp.tool(annotations=READ)
+def handoff_pending(user: str, agent: str) -> dict:
+    """Open handoffs addressed to this agent (or to "any"), oldest first, as {"pending": [...]}.
+    (A dict, not a bare list: MCP returns a list as one content block per item, so a one-item
+    list would look like a plain object to a client.)"""
+    return {"pending": tools.pending_handoffs(user, agent)}
+
+
+@mcp.tool(annotations=WRITE)
+def handoff_claim(user: str, handoff_id: str, agent: str, day: int) -> dict:
+    """Take an open handoff. Atomic: if several agents race for it, exactly one gets claimed=true."""
+    return {"claimed": store.claim_handoff(user, handoff_id, agent, day)}
+
+
+@mcp.tool(annotations=WRITE)
+def handoff_complete(user: str, handoff_id: str, agent: str, result: dict, day: int,
+                     decision_id: str | None = None) -> dict:
+    """Finish a handoff you claimed and link it to the decision it produced (false if it is not
+    yours to complete)."""
+    return {"completed": store.complete_handoff(user, handoff_id, agent, result, day, decision_id)}
+
+
+@mcp.tool(annotations=READ)
+def handoff_status(user: str, handoff_id: str) -> dict:
+    """Status, owner, result and linked decision of one handoff."""
+    return tools.get_handoff(user, handoff_id) or {"error": f"no handoff {handoff_id}"}
+
+
 if __name__ == "__main__":
     mcp.run("streamable-http" if "--http" in sys.argv else "stdio")

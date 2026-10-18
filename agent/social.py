@@ -26,8 +26,8 @@ _VALUES = [("honesty", r"honest\w*|truth"), ("show_up", r"shows? up|showing up|r
            ("peace", r"peace\w*|calm"), ("self_respect", r"respect myself|self[- ]respect"),
            ("loyalty", r"loyal\w*")]
 _QUESTION = re.compile(r"\?\s*$|\b(should i|what should i|do i|shall i|is it ok|is it okay)\b", re.I)
-_CUT = re.compile(r"\b(cut (her|him|them) off|end the friendship|stop talking to|block (her|him|them)"
-                  r"|cut ties|unfriend)\b", re.I)
+_CUT = re.compile(r"\b(cut (?:\w+ )?off|cut off|end (?:the|my|our) friendship|end it with|"
+                  r"stop talking to|block (?:\w+)|cut ties|unfriend|never speak to)\b", re.I)
 
 
 def find_contact(text, contacts):
@@ -139,13 +139,23 @@ def clause_ops(clause, contacts):
     return ops, errors, True
 
 
+def unknown_person(text, contacts):
+    """'Bob cancelled again, should I...?' where nobody has told us who Bob is: his name, else None."""
+    m = re.match(rf"^(?P<name>{NAME})\b (?:{_VERB_RE}|moved to\b)", text)
+    if m and find_contact(text, contacts) is None and _QUESTION.search(text):
+        return m["name"]
+    return None
+
+
 def situation(text, contacts):
     """Is this a question about a person? Returns {"contact", "kind", "options"} or None.
     Needs a known contact and a question; 'cut off' style asks add the irreversible option."""
     name = find_contact(text, contacts)
-    if name is None or not _QUESTION.search(text):
+    intro = re.search(rf"\bmy (?P<rel>{RELATION}) (?P<name>{NAME})\b", text)
+    if not _QUESTION.search(text) or (name is None and intro is None):
         return None
     options = ["talk", "wait", "let_it_go"]
     if _CUT.search(text):
         options.append("cut_off")
-    return {"contact": name, "kind": detect_kind(text), "options": options}
+    return {"contact": name or intro["name"], "kind": detect_kind(text), "options": options,
+            "intro": (intro["name"], intro["rel"]) if intro and name is None else None}

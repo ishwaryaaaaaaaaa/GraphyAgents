@@ -1,9 +1,10 @@
-falkordb
-falkordblite; sys_platform != "win32"
-python-dotenv
-pytest
-google-genai
-scikit-learn
-numpy
-joblib
-mcp>=2
+# Versions everything was tested with (Python 3.12). Newer versions probably work; these are known good.
+falkordb==1.8.0
+falkordblite; sys_platform != "win32"      # embedded FalkorDB; does not build on native Windows
+python-dotenv==1.2.4
+pytest==9.1.1
+google-genai==2.31.0
+scikit-learn==1.9.1                          # models/scorer.joblib was trained with this version
+numpy==2.5.4
+joblib==1.6.0
+mcp==2.3.0

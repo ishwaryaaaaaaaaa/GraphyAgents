@@ -151,15 +151,23 @@ def decide_with(ctx, options):
     }
 
 
-def decide(user, day, names, add_skip=False, record=True):
-    """Answer a fork from guarded memory, log the decision, grant an earned treat."""
+def decide(user, day, names, add_skip=False, record=True, mode="rules"):
+    """Answer a fork from guarded memory, log the decision, grant an earned treat.
+
+    mode="rules" ranks with the rule table (the default). mode="scorer" ranks the options that
+    pass the hard rules with the trained model in models/scorer.joblib."""
     options = resolve(list(names) + (["skip"] if add_skip and "skip" not in names else []))
     ctx = build_context(user, day, options)
-    result = decide_with(ctx, options)
+    if mode == "scorer":
+        from agent import scorer  # imported here: scikit-learn is only needed for this mode
+        result = scorer.decide_with_scorer(ctx, options, scorer.load())
+    else:
+        result = decide_with(ctx, options)
     if record:
         result["decision_id"] = tools.record_decision(
             user, day, result["pick"], [o["name"] for o in options], result["used_fact_ids"],
-            features=result["features"], scores=result["scores"], rules=result["rules_fired"]
+            mode=result["mode"], features=result["features"], scores=result["scores"],
+            rules=result["rules_fired"]
         )
     if result["earned_treat"]:
         tools.grant_treat(user, "sugar", day)

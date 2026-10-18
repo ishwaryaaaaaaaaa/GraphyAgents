@@ -2,7 +2,7 @@
 import pytest
 
 import cli
-from agent import extract, store, tools
+from agent import extract, tools
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def test_low_confidence_is_never_written_without_a_yes(user, monkeypatch):
     monkeypatch.setenv("LLM_MODE", "off")
     unsure = {"ops": [{"op": "set_fact", "key": "likes:pasta", "value": "no", "confidence": 0.4,
                        "days_ago": 0}], "errors": [], "source": "llm"}
-    monkeypatch.setattr(extract, "extract", lambda text, day, use_llm=True: unsure)
+    monkeypatch.setattr(extract, "extract", lambda text, day, use_llm=True, contacts=(): unsure)
     s = cli.Session(user, day=3, auto=True)   # even auto-confirm must not write it
     out = s.handle("hmm maybe I don't like pasta")
     assert "Did you mean" in out and tools.get_facts(user, 3) == {}

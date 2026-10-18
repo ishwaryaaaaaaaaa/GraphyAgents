@@ -10,7 +10,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 README = ROOT / "README.md"
-SOURCES = {"meera": "meera.md", "generated": "generated_300-499.md", "learning": "learning.md"}
+SOURCES = {"meera": "meera.md", "generated": "generated_300-499.md", "learning": "learning.md",
+           "social": "social.md", "scorer": "scorer.md", "concurrency": "concurrency.md",
+           "handoff": "handoff_demo.md"}
 
 text = README.read_text(encoding="utf-8")
 for name, file in SOURCES.items():

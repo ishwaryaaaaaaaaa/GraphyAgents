@@ -1,0 +1,130 @@
+{
+  "engine": {
+    "redis": "8.10.2",
+    "graph_module": 42201,
+    "os": "Linux 6.6.87.2-microsoft-standard-WSL2 x86_64"
+  },
+  "lives": 48,
+  "workers": 16,
+  "alone": {
+    "workers": 1,
+    "lives": 48,
+    "seconds": 111.9,
+    "operations": 3769,
+    "operations_per_second": 34,
+    "questions": 879,
+    "oracle_disagreements": 0,
+    "stale_uses": 0,
+    "leaks": [],
+    "cascades_wrong": 0,
+    "throughput": {
+      "queries": 68451,
+      "queries_per_second": 612,
+      "reads": 58104,
+      "writes": 10347,
+      "read_ms": {
+        "p50": 1.31,
+        "p95": 2.52,
+        "p99": 3.56
+      },
+      "write_ms": {
+        "p50": 1.29,
+        "p95": 2.39,
+        "p99": 3.61
+      }
+    }
+  },
+  "together": {
+    "workers": 16,
+    "lives": 48,
+    "seconds": 36.2,
+    "operations": 3769,
+    "operations_per_second": 104,
+    "questions": 879,
+    "oracle_disagreements": 0,
+    "stale_uses": 0,
+    "leaks": [],
+    "cascades_wrong": 0,
+    "throughput": {
+      "queries": 68451,
+      "queries_per_second": 1891,
+      "reads": 58104,
+      "writes": 10347,
+      "read_ms": {
+        "p50": 4.23,
+        "p95": 19.8,
+        "p99": 62.74
+      },
+      "write_ms": {
+        "p50": 4.35,
+        "p95": 31.68,
+        "p99": 102.23
+      }
+    }
+  },
+  "same_answers_as_alone": 48,
+  "agents": {
+    "ids_locked": {
+      "expected": 320,
+      "events": 320,
+      "unique_ids": 320,
+      "errors": 0
+    },
+    "ids_unlocked": {
+      "expected": 320,
+      "events": 320,
+      "unique_ids": 320,
+      "errors": 0
+    },
+    "slot_protected": {
+      "facts": 200,
+      "active": 1,
+      "edges": 199,
+      "max_out": 1,
+      "max_in": 1,
+      "unreachable": 0,
+      "expected_facts": 200,
+      "errors": 0,
+      "consistent": true
+    },
+    "slot_unprotected": {
+      "facts": 200,
+      "active": 111,
+      "edges": 192,
+      "max_out": 7,
+      "max_in": 1,
+      "unreachable": 0,
+      "expected_facts": 200,
+      "errors": 0,
+      "consistent": false
+    },
+    "compound_locked": {
+      "trials": 6,
+      "violations": 0
+    },
+    "compound_unlocked": {
+      "trials": 6,
+      "violations": 3
+    }
+  },
+  "processes": {
+    "settle_on": {
+      "facts": 120,
+      "active": 1,
+      "edges": 204,
+      "max_out": 4,
+      "max_in": 2,
+      "unreachable": 0,
+      "consistent": true
+    },
+    "settle_off": {
+      "facts": 120,
+      "active": 69,
+      "edges": 118,
+      "max_out": 4,
+      "max_in": 1,
+      "unreachable": 0,
+      "consistent": false
+    }
+  }
+}

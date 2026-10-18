@@ -1,5 +1,6 @@
 """Start mcp_server.py over stdio and talk to it with a real MCP client."""
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 async def main():
     params = StdioServerParameters(command=sys.executable, args=[str(ROOT / "mcp_server.py")],
-                                   cwd=str(ROOT))
+                                   cwd=str(ROOT), env=dict(os.environ))  # the SDK's default env is restricted
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

@@ -367,11 +367,11 @@ def describe(op):
     if k == "add_contact":
         return f"add {op['name']} ({op['relation']}) to the people in your life"
     if k == "log_interaction":
-        return f"note that {op['contact'].title()} {op['kind'].replace('_', ' ')}"
+        return f"note that {op['contact'].title()} {schema.KIND_PHRASES[op['kind']]}"
     if k == "add_value":
-        return f"remember that you value {op['tag'].replace('_', ' ')}"
+        return f"remember that you value {schema.VALUE_WORDS[op['tag']]}"
     if k == "end_value":
-        return f"stop treating {op['tag'].replace('_', ' ')} as a value"
+        return f"stop treating {schema.VALUE_WORDS[op['tag']]} as a value"
     return f"mark your {op['tag']} promise {op['status']}"
 
 
@@ -391,71 +391,80 @@ def apply_ops(user, ops, day):
     """Write the ops through store.py. Returns plain-language result lines."""
     out = []
     for op in ops:
-        k = op["op"]
-        if k == "set_fact":
-            key, value = op["key"], op["value"]
-            d = _eff_day(user, key, day, op["days_ago"])
-            if key.startswith("contact:") and not tools.get_contact(user, key.split(":")[1]):
-                out.append(f"I don't know {key.split(':')[1].title()} yet (skipped {key})")
-                continue
-            _, dropped = store.set_fact(user, key, value, d, source=op.get("source", "extracted"),
-                                        confidence=op["confidence"])
-            line = f"{key} = {value}"
-            if key.endswith(":status") and value == "strained":
-                cid = key.split(":")[1]  # a strained friendship exists only while it is strained
-                store.set_fact(user, f"avoid_inviting_{cid}", "yes", d, derived_from=[key])
-            if key == "lives_in" and value == "hostel":
-                store.set_fact(user, "mess_meals_available", "yes", d, derived_from=["lives_in"])
-            if key.startswith("dislikes:") and value == "yes":
-                item = key.split(":", 1)[1]
-                store.set_fact(user, f"avoid_{item}_orders", "yes", d, derived_from=[key])
-            out.append(line + (f" (no longer true: {', '.join(dropped)})" if dropped else ""))
-        elif k == "retract_fact":
-            dropped = store.retract_fact(user, op["key"], day, op.get("reason", ""))
-            out.append(f"retracted {op['key']}" + (f" (also dropped: {', '.join(dropped)})"
-                                                    if dropped else ""))
-        elif k == "start_goal":
-            store.start_goal(user, op["tag"], day)
-            out.append(f"started the {op['tag']} goal")
-        elif k == "end_goal":
-            ended = store.end_goal(user, op["tag"], day)
-            out.append(f"ended the {op['tag']} goal" if ended else f"no active {op['tag']} goal")
-        elif k == "log_event":
-            store.log_event(user, op["kind"], op["what"], op["tag"], day - op["days_ago"])
-            out.append(f"logged {op['kind']}")
-        elif k == "make_promise":
-            contact = op.get("contact")
-            if contact and not tools.get_contact(user, contact):
-                out.append(f"I don't know {contact.title()} yet (skipped the promise)")
-                continue
-            store.make_promise(user, op["text"], op["tag"], day, contact=contact)
-            out.append(f"noted promise: {op['text']}")
-        elif k == "add_contact":
-            known = tools.get_contact(user, store.contact_id(op["name"]))
-            store.add_contact(user, op["name"], op["relation"], day)
-            out.append(f"{op['name'].title()} was already in your life" if known
-                       else f"added {op['name'].title()} ({op['relation']})")
-        elif k == "log_interaction":
-            if not tools.get_contact(user, op["contact"]):
-                out.append(f"I don't know {op['contact'].title()} yet (skipped)")
-                continue
-            store.log_interaction(user, op["contact"], op["kind"], op["tone"], op["what"],
-                                  day - op["days_ago"])
-            out.append(f"noted: {op['contact'].title()} {op['kind'].replace('_', ' ')}")
-        elif k == "add_value":
-            vid = store.add_value(user, op["tag"], op["text"], day)
-            out.append(f"noted that you value {op['tag'].replace('_', ' ')}" if vid
-                       else f"you already value {op['tag'].replace('_', ' ')}")
-        elif k == "end_value":
-            ended = store.end_value(user, op["tag"], day)
-            out.append(f"{op['tag'].replace('_', ' ')} is no longer a value" if ended
-                       else f"you didn't hold {op['tag'].replace('_', ' ')} as a value")
-        elif k == "mark_promise":
-            open_ = [p for p in tools.get_open_promises(user, op["tag"], day, 0)
-                     if p["status"] == "open"]
-            if not open_:
-                out.append(f"no open {op['tag']} promise to mark")
-            else:
-                store.mark_promise(user, open_[-1]["id"], op["status"], day)
-                out.append(f"promise '{open_[-1]['text']}' marked {op['status']}")
+        with store.user_lock(user):  # a fact plus the facts derived from it must land together
+            out += _apply_one(user, op, day)
+    return out
+
+
+def _apply_one(user, op, day):
+    """One operation. Returns its result lines (an empty list when it was skipped)."""
+    out = []
+    k = op["op"]
+    if k == "set_fact":
+        key, value = op["key"], op["value"]
+        d = _eff_day(user, key, day, op["days_ago"])
+        if key.startswith("contact:") and not tools.get_contact(user, key.split(":")[1]):
+            out.append(f"I don't know {key.split(':')[1].title()} yet (skipped {key})")
+            return out
+        _, dropped = store.set_fact(user, key, value, d, source=op.get("source", "extracted"),
+                                    confidence=op["confidence"])
+        line = f"{key} = {value}"
+        if key.endswith(":status") and value == "strained":
+            cid = key.split(":")[1]  # a strained friendship exists only while it is strained
+            store.set_fact(user, f"avoid_inviting_{cid}", "yes", d, derived_from=[key])
+        if key == "lives_in" and value == "hostel":
+            store.set_fact(user, "mess_meals_available", "yes", d, derived_from=["lives_in"])
+        if key.startswith("dislikes:") and value == "yes":
+            item = key.split(":", 1)[1]
+            store.set_fact(user, f"avoid_{item}_orders", "yes", d, derived_from=[key])
+        out.append(line + (f" (no longer true: {', '.join(dropped)})" if dropped else ""))
+    elif k == "retract_fact":
+        dropped = store.retract_fact(user, op["key"], day, op.get("reason", ""))
+        out.append(f"retracted {op['key']}" + (f" (also dropped: {', '.join(dropped)})"
+                                                if dropped else ""))
+    elif k == "start_goal":
+        store.start_goal(user, op["tag"], day)
+        out.append(f"started the {op['tag']} goal")
+    elif k == "end_goal":
+        ended = store.end_goal(user, op["tag"], day)
+        out.append(f"ended the {op['tag']} goal" if ended else f"no active {op['tag']} goal")
+    elif k == "log_event":
+        store.log_event(user, op["kind"], op["what"], op["tag"], day - op["days_ago"])
+        out.append(f"logged {op['kind']}")
+    elif k == "make_promise":
+        contact = op.get("contact")
+        if contact and not tools.get_contact(user, contact):
+            out.append(f"I don't know {contact.title()} yet (skipped the promise)")
+            return out
+        store.make_promise(user, op["text"], op["tag"], day, contact=contact)
+        out.append(f"noted promise: {op['text']}")
+    elif k == "add_contact":
+        known = tools.get_contact(user, store.contact_id(op["name"]))
+        store.add_contact(user, op["name"], op["relation"], day)
+        out.append(f"{op['name'].title()} was already in your life" if known
+                   else f"added {op['name'].title()} ({op['relation']})")
+    elif k == "log_interaction":
+        if not tools.get_contact(user, op["contact"]):
+            out.append(f"I don't know {op['contact'].title()} yet (skipped)")
+            return out
+        store.log_interaction(user, op["contact"], op["kind"], op["tone"], op["what"],
+                              day - op["days_ago"])
+        out.append(f"{op['contact'].title()} {schema.KIND_PHRASES[op['kind']]}")
+    elif k == "add_value":
+        vid = store.add_value(user, op["tag"], op["text"], day)
+        word = schema.VALUE_WORDS[op["tag"]]
+        out.append(f"noted that you value {word}" if vid else f"you already value {word}")
+    elif k == "end_value":
+        ended = store.end_value(user, op["tag"], day)
+        word = schema.VALUE_WORDS[op["tag"]]
+        out.append(f"{word} is no longer a value" if ended
+                   else f"you didn't hold {word} as a value")
+    elif k == "mark_promise":
+        open_ = [p for p in tools.get_open_promises(user, op["tag"], day, 0)
+                 if p["status"] == "open"]
+        if not open_:
+            out.append(f"no open {op['tag']} promise to mark")
+        else:
+            store.mark_promise(user, open_[-1]["id"], op["status"], day)
+            out.append(f"promise '{open_[-1]['text']}' marked {op['status']}")
     return out

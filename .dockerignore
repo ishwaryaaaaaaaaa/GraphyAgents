@@ -1,0 +1,12 @@
+# Keep secrets and bulky local state out of the image. `COPY . .` would otherwise bake a local
+# .env (with a real API key) into it.
+.env
+.venv/
+.git/
+.cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+.llm_cache.json
+.llm_calls.jsonl
+results/generated_*.json

@@ -4,10 +4,30 @@ Rules live here: supersede, retract, cascade. The read-side guard is in tools.py
 Time is an integer simulation day passed in by the caller. Nothing is ever deleted;
 facts change status instead.
 """
+import contextlib
+import threading
+
 from agent import schema
 from agent.db import drop_graph, get_graph
 
 _ensured = set()
+
+# Concurrency. Reads never block. A write that reads first and then writes (set_fact, retract_fact,
+# add_contact, add_value, a handoff claim) must not interleave with another writer to the same
+# graph. Two layers: an in-process lock per user (LOCKING), and a repair step after every fact write
+# (SETTLE) that makes the graph converge even when the other writer is a different process, such as
+# a second MCP server. Both can be switched off so the stress test can show what each one prevents.
+LOCKING = True
+SETTLE = True
+_locks, _locks_guard = {}, threading.Lock()
+
+
+def user_lock(user):
+    """A re-entrant lock for one person's graph (a no-op context if LOCKING is off)."""
+    if not LOCKING:
+        return contextlib.nullcontext()
+    with _locks_guard:
+        return _locks.setdefault(user, threading.RLock())
 
 
 def reset(user):
@@ -72,9 +92,36 @@ def cascade(user, fact_id, status, day):
     return sorted({r[0] for r in rows})
 
 
+def settle(user, key, day):
+    """Make sure exactly one fact is active for this slot.
+
+    Two writers in different processes can both read "nothing active", both create a fact, and leave
+    two active rows. The newest (highest seq) wins; every older active row is superseded in order,
+    its cascade runs, and the SUPERSEDED_BY chain is kept linear. Idempotent and safe to run twice."""
+    g = get_graph(user)
+    rows = g.query("MATCH (f:Fact {key:$k, status:'active'}) RETURN f.id ORDER BY f.seq",
+                   {"k": key}).result_set
+    ids = [r[0] for r in rows]
+    for older, newer in zip(ids, ids[1:]):
+        g.query("MATCH (o:Fact {id:$o}) SET o.status='superseded', o.valid_to=$day",
+                {"o": older, "day": day})
+        g.query("MATCH (o:Fact {id:$o}), (n:Fact {id:$n}) MERGE (o)-[:SUPERSEDED_BY]->(n)",
+                {"o": older, "n": newer})
+        cascade(user, older, schema.INVALIDATED, day)
+    return len(ids) - 1 if len(ids) > 1 else 0
+
+
 def set_fact(user, key, value, day, source="typed", confidence=1.0,
              derived_from=(), ttl_days=None):
     """Write a belief. Returns (fact_id, keys_dropped_by_cascade)."""
+    with user_lock(user):
+        out = _set_fact(user, key, value, day, source, confidence, derived_from, ttl_days)
+        if SETTLE:
+            settle(user, key, day)
+        return out
+
+
+def _set_fact(user, key, value, day, source, confidence, derived_from, ttl_days):
     ensure_user(user)
     g = get_graph(user)
 
@@ -130,15 +177,16 @@ def set_fact(user, key, value, day, source="typed", confidence=1.0,
 
 def retract_fact(user, key, day, reason=""):
     """The fact was never true. Returns keys dropped by the cascade ([] if nothing active)."""
-    ensure_user(user)
-    fid, _ = _active_id(user, key)
-    if fid is None:
-        return []
-    get_graph(user).query(
-        "MATCH (f:Fact {id:$id}) SET f.status='retracted', f.valid_to=$day, f.reason=$r",
-        {"id": fid, "day": day, "r": reason},
-    )
-    return cascade(user, fid, schema.RETRACTED, day)
+    with user_lock(user):
+        ensure_user(user)
+        fid, _ = _active_id(user, key)
+        if fid is None:
+            return []
+        get_graph(user).query(
+            "MATCH (f:Fact {id:$id, status:'active'}) SET f.status='retracted', f.valid_to=$day, "
+            "f.reason=$r", {"id": fid, "day": day, "r": reason},
+        )
+        return cascade(user, fid, schema.RETRACTED, day)
 
 
 # ---- plain writes: goals, promises, events ------------------------------------------
@@ -231,14 +279,17 @@ def add_contact(user, name, relation, day, closeness=3):
     if not cid:
         raise ValueError("a contact needs a name")
     g = get_graph(user)
-    if g.query("MATCH (c:Contact {id:$c}) RETURN c.id", {"c": cid}).result_set:
-        return cid
-    g.query(
-        "MATCH (p:Person {id:$u}) "
-        "CREATE (c:Contact {id:$c, name:$n, relation:$r, closeness:$k, since:$day}) "
-        "CREATE (p)-[:KNOWS]->(c)",
-        {"u": user, "c": cid, "n": name.strip().title(), "r": relation, "k": closeness, "day": day},
-    )
+    with user_lock(user):
+        if g.query("MATCH (c:Contact {id:$c}) RETURN c.id", {"c": cid}).result_set:
+            return cid
+        g.query(
+            "MATCH (p:Person {id:$u}) "
+            "MERGE (c:Contact {id:$c}) "
+            "ON CREATE SET c.name=$n, c.relation=$r, c.closeness=$k, c.since=$day "
+            "MERGE (p)-[:KNOWS]->(c)",
+            {"u": user, "c": cid, "n": name.strip().title(), "r": relation, "k": closeness,
+             "day": day},
+        )
     return cid
 
 
@@ -274,13 +325,60 @@ def add_value(user, tag, text, day):
         raise ValueError(f"value tag must be one of {schema.VALUE_TAGS}")
     ensure_user(user)
     g = get_graph(user)
-    if g.query("MATCH (v:Value {tag:$t, status:'active'}) RETURN v.id", {"t": tag}).result_set:
-        return None  # already held
-    vid = f"v{_next(user)}"
-    g.query("MATCH (p:Person {id:$u}) CREATE (v:Value {id:$id, tag:$t, text:$x, since:$d, "
-            "status:'active'}) CREATE (p)-[:HOLDS]->(v)",
-            {"u": user, "id": vid, "t": tag, "x": text[:120], "d": day})
+    with user_lock(user):
+        if g.query("MATCH (v:Value {tag:$t, status:'active'}) RETURN v.id", {"t": tag}).result_set:
+            return None  # already held
+        vid = f"v{_next(user)}"
+        g.query("MATCH (p:Person {id:$u}) CREATE (v:Value {id:$id, tag:$t, text:$x, since:$d, "
+                "status:'active'}) CREATE (p)-[:HOLDS]->(v)",
+                {"u": user, "id": vid, "t": tag, "x": text[:120], "d": day})
     return vid
+
+
+# ---- handoffs between agents ----------------------------------------------------------------
+
+def create_handoff(user, from_agent, to_agent, task, payload, day):
+    """One agent asks another to do something, through the graph: a `Handoff` node that anyone with
+    access to this person's graph can see. `to_agent` may be "any"."""
+    import json
+    ensure_user(user)
+    hid = f"h{_next(user)}"
+    get_graph(user).query(
+        "MATCH (p:Person {id:$u}) "
+        "CREATE (h:Handoff {id:$id, from_agent:$f, to_agent:$t, task:$task, payload:$pl, "
+        "status:'open', created:$day}) CREATE (p)-[:HAS_HANDOFF]->(h)",
+        {"u": user, "id": hid, "f": from_agent, "t": to_agent, "task": task,
+         "pl": json.dumps(payload or {}), "day": day},
+    )
+    return hid
+
+
+def claim_handoff(user, hid, agent, day):
+    """Take an open handoff. ONE query that both checks the status and changes it, so when several
+    agents race for the same handoff exactly one gets True (FalkorDB runs write queries on a graph
+    one at a time)."""
+    rows = get_graph(user).query(
+        "MATCH (h:Handoff {id:$h, status:'open'}) WHERE h.to_agent=$a OR h.to_agent='any' "
+        "SET h.status='claimed', h.claimed_by=$a, h.claimed=$day RETURN h.id",
+        {"h": hid, "a": agent, "day": day},
+    ).result_set
+    return bool(rows)
+
+
+def complete_handoff(user, hid, agent, result, day, decision_id=None):
+    """Finish a handoff you claimed, and link it to the decision it produced. False if it is not
+    yours to complete."""
+    import json
+    g = get_graph(user)
+    rows = g.query(
+        "MATCH (h:Handoff {id:$h, status:'claimed', claimed_by:$a}) "
+        "SET h.status='done', h.result=$r, h.completed=$day RETURN h.id",
+        {"h": hid, "a": agent, "r": json.dumps(result, default=str), "day": day},
+    ).result_set
+    if rows and decision_id:
+        g.query("MATCH (h:Handoff {id:$h}), (d:Decision {id:$d}) MERGE (h)-[:RESULTED_IN]->(d)",
+                {"h": hid, "d": decision_id})
+    return bool(rows)
 
 
 def end_value(user, tag, day):
@@ -311,11 +409,49 @@ def raw_facts(user):
     """
     ensure_user(user)
     rows = get_graph(user).query(
-        "MATCH (f:Fact) RETURN f.id, f.key, f.value, f.status, f.valid_from, f.valid_to, f.seq "
-        "ORDER BY f.seq"
+        "MATCH (f:Fact) RETURN f.id, f.key, f.value, f.status, f.valid_from, f.valid_to, f.seq, "
+        "f.source ORDER BY f.seq"
     ).result_set
-    cols = ("id", "key", "value", "status", "valid_from", "valid_to", "seq")
+    cols = ("id", "key", "value", "status", "valid_from", "valid_to", "seq", "source")
     return [dict(zip(cols, r)) for r in rows]
+
+
+def raw_slot_report(user, key):
+    """EVAL ONLY: the structure of one slot's history, for the concurrency stress test. How many
+    facts, how many active, the SUPERSEDED_BY edges and degrees, and how many old facts cannot reach
+    the active one."""
+    g = get_graph(user)
+    rows = g.query("MATCH (f:Fact {key:$k}) RETURN f.id, f.status", {"k": key}).result_set
+    edges = g.query("MATCH (a:Fact {key:$k})-[:SUPERSEDED_BY]->(b:Fact) RETURN a.id, b.id",
+                    {"k": key}).result_set
+    out, inn = {}, {}
+    for a, b in edges:
+        out[a] = out.get(a, 0) + 1
+        inn[b] = inn.get(b, 0) + 1
+    unreachable = g.query(
+        "MATCH (f:Fact {key:$k}) WHERE f.status <> 'active' AND NOT "
+        "(f)-[:SUPERSEDED_BY*1..400]->(:Fact {key:$k, status:'active'}) RETURN count(f)",
+        {"k": key}).result_set[0][0]
+    return {"facts": len(rows), "active": sum(r[1] == "active" for r in rows), "edges": len(edges),
+            "max_out": max(out.values(), default=0), "max_in": max(inn.values(), default=0),
+            "unreachable": unreachable}
+
+
+def raw_edges(user):
+    """INSPECTION ONLY (the web UI's graph view): the SUPERSEDED_BY and DERIVED_FROM links between
+    facts of every status, as {"superseded": [[old, new]], "derived": [[child, parent]]}."""
+    g = get_graph(user)
+    sup = g.query("MATCH (a:Fact)-[:SUPERSEDED_BY]->(b:Fact) RETURN a.id, b.id").result_set
+    der = g.query("MATCH (c:Fact)-[:DERIVED_FROM]->(p:Fact) RETURN c.id, p.id").result_set
+    return {"superseded": [list(r) for r in sup], "derived": [list(r) for r in der]}
+
+
+def raw_parent_status(user, key):
+    """EVAL ONLY: (id, status) of the fact the ACTIVE fact `key` was derived from, or None."""
+    rows = get_graph(user).query(
+        "MATCH (m:Fact {key:$k, status:'active'}) OPTIONAL MATCH (m)-[:DERIVED_FROM]->(p:Fact) "
+        "RETURN p.id, p.status", {"k": key}).result_set
+    return (rows[0][0], rows[0][1]) if rows else None
 
 
 def raw_goals(user):
