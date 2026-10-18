@@ -11,3 +11,6 @@ results/*.tmp
 # per-question dumps are large and regenerable; the .md tables and disagreement lists are kept
 results/generated_*.json
 !results/generated_*_disagreements.json
+
+# generated Hugging Face Space bundle
+build/
