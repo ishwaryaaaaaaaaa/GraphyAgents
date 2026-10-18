@@ -12,7 +12,7 @@ services:
     name: decisive
     runtime: docker
     dockerfilePath: ./Dockerfile
-    dockerCommand: sh -c "python ui_server.py --host 0.0.0.0 --port ${PORT:-10000}"
+    dockerCommand: python ui_server.py --host 0.0.0.0   # the app listens on $PORT, which Render sets
     plan: free              # sleeps after ~15 minutes without visits and takes about a minute to wake
     region: oregon
     healthCheckPath: /api/health

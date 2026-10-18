@@ -332,7 +332,8 @@ def make_server(host="127.0.0.1", port=8765):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1", help="bind address (keep it loopback unless you must)")
-    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8765")),
+                    help="port to listen on (default: $PORT, which hosts like Render set, else 8765)")
     ap.add_argument("--verbose", action="store_true", help="log every request")
     args = ap.parse_args(argv)
     Handler.quiet = not args.verbose
