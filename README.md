@@ -1,15 +1,199 @@
-# Decisive agent
+# Decisive
 
-**An agent whose memory is a FalkorDB graph, and whose answers never rest on a fact that has stopped being true.**
+**An agent that never gives you advice based on something that stopped being true.**
 
-Agents that remember are not enough: when a fact changes ("I turned vegetarian", "I moved out of the hostel", "that was wrong about paneer"), a memory that merely keeps everything will keep acting on the old version. This project stores a person's goals, promises, tastes and facts as a graph, gives every fact a lifecycle (active, superseded, retracted, invalidated), and routes every read through a guard that returns only what is true now. Then it measures how often an agent uses something that is no longer true.
+I'm 20, I overthink everything, and for a long time I wanted one thing: someone who knows me well enough to just say *"yes, have the sweet, you've been off sugar for ten days"* or *"let this one go, it's the first time she's cancelled."* Not a generic chatbot. Someone who remembers who I am **today**.
 
-Fictional data only. Runs from the command line and from tests; the proof is a table of numbers.
+The problem is that most AI memory only ever adds. Tell it in March you eat meat, tell it in May you turned vegetarian, and it still suggests chicken, because both sentences are sitting in its memory and nothing says which one is still true. So I built the opposite: a memory where every fact has a life, and only the living ones are allowed near an answer. The memory is a [FalkorDB](https://www.falkordb.com) graph.
+
+- **Live demo:** *(your Render link)*
+- **Blog (the story of building it):** [BLOG.md](BLOG.md)
+- **Video:** *(your video link)*
+- **Submission answers:** [SUBMISSION.md](SUBMISSION.md)
+
+Everything in here is fictional data. No real person has used it yet, and I say so again in the limits section, because it matters.
+
+---
+
+## What it does, in one minute
+
+You talk to it in plain sentences. It remembers some, forgets nothing, and uses only what is true now.
+
+| You say | It does |
+|---|---|
+| "I eat meat again" | stores `diet_style = non_veg` from today |
+| "I turned vegetarian" | stores the new fact, keeps the old one as history, and drops anything that depended on it |
+| "fried chicken or chana chaat?" | picks one, says why, and lists the exact facts it used |
+| "that was wrong about paneer wrap" | retracts that fact and everything built on it |
+| "my friend Sam cancelled again, should I say something?" | looks at the pattern, your promises and your values, and gives advice that is not just flattery |
+
+Then you can drag a slider to see what it believed on any day, or open the graph and watch the exact path from you to an answer light up.
+
+---
+
+## The user journey
+
+```mermaid
+journey
+    title A first visit to Decisive
+    section Arrive
+      Read what it is and why it is different: 5: You
+      Start with a blank memory, or watch the demo: 5: You
+    section Teach it
+      Say I eat meat again: 5: You
+      Say I love samosa: 4: You
+    section Ask
+      Ask pasta or sprouts: 5: You, Agent
+      Read the pick and the Why box: 5: You
+    section Change your mind
+      Say I turned vegetarian: 5: You
+      Ask again and get a different answer: 5: You, Agent
+    section Check its work
+      Drag the time travel slider: 5: You
+      Open the graph path behind an answer: 5: You
+      Say whether it worked out: 4: You
+```
+
+Every visitor gets a new, empty, private memory (a random id kept in that browser tab). Nobody is pre-loaded.
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    U([You, in the browser]) --> W["Website<br/>ui/index.html"]
+    W -->|JSON| S["ui_server.py"]
+    S --> C["Chat session<br/>cli.py"]
+    C -->|a sentence| X["Reader<br/>regex grammar, optional Gemini"]
+    X -->|checked updates| M[("store.py<br/>the only writer")]
+    C -->|a question| D["Decider<br/>rules, trained scorer, advice"]
+    D -->|guarded reads| T["tools.py<br/>the only read door"]
+    M --> F[("FalkorDB<br/>one graph per person")]
+    T --> F
+    D -->|decision plus USED edges| M
+    A["Other agents"] -->|MCP| MC["mcp_server.py"]
+    MC --> T
+    MC --> M
+```
+
+The rule I care about most: **the database decides what is true.** An LLM, if you turn one on, can only turn a sentence into updates or reword an answer, and everything it produces is checked before anything is written. The whole thing runs, and is tested, with the LLM off.
+
+### What happens when you ask a question
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant You
+    participant Chat as Chat session
+    participant Tools as tools.py (the guard)
+    participant DB as FalkorDB
+    participant Decide as Decider
+    You->>Chat: fried chicken or chana chaat?
+    Chat->>Tools: what is true today?
+    Tools->>DB: MATCH Fact WHERE status is active
+    DB-->>Tools: diet vegetarian, likes samosa, ...
+    Tools-->>Chat: only live facts
+    Chat->>Decide: the options plus the live facts
+    Decide-->>Chat: a pick, reasons, the facts used
+    Chat->>DB: write a Decision node with USED edges
+    Chat-->>You: the pick, a plain reason, the receipts
+```
+
+### The idea in one picture: every fact has a life
+
+```mermaid
+stateDiagram-v2
+    [*] --> active: you say it
+    active --> superseded: a newer value replaces it
+    active --> retracted: you say it was wrong
+    active --> invalidated: a fact it depended on changed
+    superseded --> [*]: kept as history
+    retracted --> [*]: kept, never counts
+    invalidated --> [*]: kept, never counts
+```
+
+Nothing is ever deleted. Only `active` facts can reach an answer, and that is enforced in one place, not by hoping every query remembers.
+
+---
+
+## How it was built, in phases
+
+```mermaid
+timeline
+    title Eight phases, in order
+    Phase 1 - Foundations : Graph model : Four memory rules : Read guard
+    Phase 2 - Tools and decisions : Named Cypher tools : Rule table : A hand-written 55 day life
+    Phase 3 - Proof : Independent oracle : Generated lives : Injected bugs
+    Phase 4 - More intelligence : Learning from outcomes : Advice about friends : A trained scorer
+    Phase 5 - Track 2 : Many people at once : Locks and atomic claims : Two agents over MCP
+    Phase 6 - The real engine : From WSL to Docker : Official FalkorDB server
+    Phase 7 - A real product : Website : Landing page : Conversational replies
+    Phase 8 - Shipping : Render : This README : The blog
+```
+
+1. **Foundations.** I started with the four rules before any code that talked: supersede, retract, cascade, guard. If those are wrong, nothing above them can be right.
+2. **Tools and decisions.** Named, parameterised Cypher queries (the only way the agent can read), a decision rule table, and Meera, a hand-written 55-day life with traps in it, to test against.
+3. **Proof.** A checker that never imports the agent, a generator that makes thousands of lives, and baselines that read the same graph with a dumber rule. This is the phase that taught me my first tests were too easy.
+4. **More intelligence.** Learning from how a choice turned out, a judgment layer for advice about friends (patterns, promises, your values), and a small trained scorer to compare against the rules.
+5. **Track 2.** Many people at once, many agents on one person, many processes on one slot, and two agents handing work to each other over MCP.
+6. **The real engine.** I developed on an embedded FalkorDB, then moved everything to the official server in Docker and reran every result there.
+7. **A real product.** A website you can understand in ten seconds: a landing page, an answer card that shows its reasons, a memory timeline with time travel, a graph view, and replies that sound like a person.
+8. **Shipping.** Deploying, writing this, and a blog.
+
+---
+
+## Where it broke, and how it got fixed
+
+This is the part I'm proudest of, honestly. Almost everything below was caught by a test I wrote, or by running it somewhere new.
+
+| What broke | Why | The fix |
+|---|---|---|
+| The embedded FalkorDB would not install on Windows | `falkordblite` does not build on native Windows | Ran it in WSL, then moved to the official server in Docker |
+| Docker failed in strange ways, then the image came out corrupt | My C: drive was nearly full (about 0.5 GB free) | Freed space, reset Docker, pinned `falkordb/falkordb:v4.22.1-alpine` |
+| My own rule flagged my own code | A test says only three files may read facts; a helper script broke it | Added clearly labelled raw readers in `store.py` for evaluation only |
+| My tests passed everything, which was suspicious | The question generator was too easy | Injected 7 known bugs on purpose; the first version caught only 4. Rebuilt the generator to aim at close calls. Now all 7 are caught |
+| A checker disagreement on 28 of 1,478 friend questions | My generator broke a documented rule (the same value written twice is a no-op) | Fixed the generator, not the engine |
+| Learning made accuracy drop | I rewarded good outcomes and punished bad ones equally | Learn from mistakes only |
+| The trained scorer stalled around 92% | A pointwise model could not separate close pairs | Switched to a pairwise ranking model, and added a position feature for ties. The README says this used information from the test set |
+| 111 active facts in a slot that should hold one | Eight threads wrote to one slot at once | A per-person lock, a repair step that keeps the history chain straight, and an atomic claim for handoffs |
+| The two-agent MCP demo hung forever | The library returned a list as separate blocks | Wrapped the result in an object and made the demo fail fast |
+| Three bugs that only appeared on Linux | A multiprocessing deadlock, an MCP server that lost its environment, and buffered output that looked frozen | Used `spawn`, passed the environment through (and warn when the database is unset), set `PYTHONUNBUFFERED` |
+| A normal sentence set off the crisis filter | "hit me up" matched a worrying phrase | Fixed the pattern and added a test |
+| The sentence reader missed simple cases | A regex was missing a space in "moved to" | Fixed and tested |
+| My first website looked like a debug console | It spoke in `slot` and `valid_from` | Redesigned it several times: landing page, answer cards, timeline, a graph on a dark canvas |
+| The local site kept showing the old page | The page is baked into the Docker image | Rebuild the container after any page change |
+| Replies felt robotic ("Done: diet_style = non_veg") | I printed the stored fact | A conversational layer: it answers in plain sentences, then shows what was saved |
+| Flaky tests on Windows | The server replied before reading the request body, which reset the connection | Read the body first |
+
+### The night the deploy fought back
+
+```mermaid
+flowchart LR
+    A["Push to GitHub"] --> B["Render Blueprint"]
+    B -->|database on a paid plan| C["Asks for a card"]
+    C -->|rebuild| D["Free plan, FalkorDB embedded in the app"]
+    D --> E["Builds, then exits with status 127"]
+    E -->|the app reads PORT itself| F["Live"]
+```
+
+The first blueprint ran a separate paid database. I would not put a card on a hackathon, so I rebuilt it to run FalkorDB inside the web service. That built fine and then crashed: Render ran my whole `sh -c "..."` command as one program name. The fix was to stop telling it how to start and let the app read `PORT` from the environment.
+
+---
 
 ## Tracks
 
 - **Track 01, agents that act on connected data.** Named, parameterised query tools (`agent/tools.py`) exposed over MCP (`mcp_server.py`), multi-hop lookups (`related_facts`, cascade), PageRank over goal events, an explainable `shortestPath` audit trail from person to decision, and logged actions (treats, events, decisions).
 - **Track 02, agent memory and coordination.** Memory that corrects itself: supersede, retract and cascade, a read guard, time travel (`get_fact_at`), persistent per-user graphs (one graph per user, isolated), and an audit trail. Many agents can share one person's memory: a stress test runs dozens of people and many agents in parallel, and agents hand work to each other through the graph (see "Track 2: concurrency and multi-agent coordination" below).
+
+## What I would do next
+
+- Teach it more than food and friends (work, money, health), and more foods than the 44 it knows today. It does not know Oreos yet, which is a small heartbreak.
+- Put real people in front of it. Everything so far is synthetic.
+- Let it ask "is this still true?" when a fact gets old.
+- Keep memories across restarts on the live demo (today they reset when the free server sleeps).
+
+---
 
 ## Results
 
@@ -235,6 +419,25 @@ The database decides what is true; the LLM only reads what the database hands it
 ## Graph data model
 
 One graph per person. A node's label is its type; edges point as shown.
+
+```mermaid
+erDiagram
+    PERSON ||--o{ FACT : HAS_FACT
+    FACT |o--o| FACT : SUPERSEDED_BY
+    FACT }o--o{ FACT : DERIVED_FROM
+    PERSON ||--o{ DECISION : CHOSE
+    DECISION }o--o{ FACT : USED
+    DECISION ||--o| OUTCOME : LED_TO
+    OUTCOME }o--o{ WEIGHT : ADJUSTED
+    PERSON ||--o{ WEIGHT : HAS_WEIGHT
+    PERSON ||--o{ CONTACT : KNOWS
+    EVENT }o--o{ GOAL : ADVANCES
+    EVENT }o--o{ CONTACT : INVOLVES
+    PERSON ||--o{ VALUE : HOLDS
+    DECISION }o--o{ VALUE : APPLIED
+    PERSON ||--o{ HANDOFF : HAS_HANDOFF
+```
+
 
 | Node | Properties |
 |---|---|
