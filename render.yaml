@@ -1,23 +1,13 @@
-# Render Blueprint: the website (landing page and app) plus its FalkorDB database.
+# Render Blueprint: the website (landing page and app), on the free plan, no card needed.
+#
+# The memory is still a real FalkorDB graph: with FALKORDB_HOST unset, the app starts FalkorDB embedded
+# in the same container (the falkordblite package). Free web services have no persistent disk, so
+# memories are kept only while the service is running; when it sleeps or redeploys they reset.
+# That suits a public demo, where every visitor starts with a blank private memory anyway.
+# For memories that survive restarts, run the website with its own FalkorDB: see docker-compose.yml.
 #
 # Deploy: push this repo to GitHub, then on Render choose New > Blueprint and select the repo.
-# Both services are created in one region so they can reach each other on Render's private network.
 services:
-  # The database. A private service: reachable only by your other services, never from the internet.
-  # Disks and private services need a paid plan on Render (there is no free tier for either).
-  - type: pserv
-    name: falkordb
-    runtime: image
-    image:
-      url: docker.io/falkordb/falkordb:v4.22.1-alpine   # the version every reported result was produced on
-    plan: starter
-    region: oregon
-    disk:
-      name: falkordb-data
-      mountPath: /var/lib/falkordb/data                 # memories survive restarts and deploys
-      sizeGB: 1
-
-  # The website. Builds from the Dockerfile in this repo.
   - type: web
     name: decisive
     runtime: docker
@@ -27,14 +17,7 @@ services:
     region: oregon
     healthCheckPath: /api/health
     envVars:
-      - key: FALKORDB_HOST
-        fromService:
-          type: pserv
-          name: falkordb
-          property: host
-      - key: FALKORDB_PORT
-        value: "6379"
       - key: LLM_MODE
         value: "off"
       - key: UI_MAX_SESSIONS   # most people's memories this server will hold; beyond it, new visitors get a 503
-        value: "2000"
+        value: "500"
