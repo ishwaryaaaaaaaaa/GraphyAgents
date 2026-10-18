@@ -284,20 +284,33 @@ class Session:
                     "friend can, but I'm listening. If something happened with someone, tell me about them "
                     "(\"my friend Sam ...\") and I'll help you think it through.")
         if line.strip().endswith("?") or re.match(r"(?:should|could|would|can|is|am|do|does|will|why|how|when|where|who)\b", t):
+            notes = [v[0] for k, v in facts.items() if k.startswith("note:")][-5:]
+            ctx = (" What I know about you so far: " + "; ".join(notes) + ". I can't weigh that against it yet, "
+                   "but tell me more and I'll keep it all in mind.") if notes else ""
             return ("Good question. I can't answer that one, because I only weigh food choices and friendships. "
                     "If you're choosing between two things I know, ask like \"pasta or sprouts?\". If it's about "
-                    "a friend, tell me what happened.")
-        if re.match(r"(?:i am|i'm|i have|i work|i study|i live|i go|i was|i got|my name is|my )", t):
-            return (f"Thanks for telling me that. I can't keep \"{line.strip().rstrip('.!')[:80]}\" as a memory yet, "
-                    "because right now I only track food, goals, promises and the people in your life. "
-                    "Say it one of those ways, like \"I'm trying to cut sugar\" or \"my friend Sam cancelled again\", "
-                    "and I'll remember it.")
+                    "a friend, tell me what happened." + ctx)
+        if re.match(r"(?:i am|i'm|i have|i work|i study|i live|i go|i was|i got|i like|i love|i prefer|i usually|i always|"
+                    r"i never|i need|i want|my name is|my )", t):
+            # Not something the decision rules use, but still part of who you are: keep it as a note.
+            text = line.strip().rstrip(".!")[:100]
+            slug = re.sub(r"[^a-z0-9]+", "_", t).strip("_")[:40]
+            store.set_fact(self.user, f"note:{slug}", text, self.day, source="typed", confidence=1.0)
+            return (f"Got it, I'll remember that: \"{text}\". I can't use it to make food or friend decisions "
+                    "yet, but it is saved in your memory (see the Memory page).")
         return None
 
     def _tell(self, line):
         got = extract.extract(line, self.day, contacts=self._contact_names())
         msgs = [f"(skipped: {e})" for e in got["errors"]]
         if not got["ops"]:
+            if got["errors"] and any("haven't learned" in e for e in got["errors"]) and re.match(
+                    r"i (?:really )?(?:like|love|enjoy|hate|dislike|prefer)", line.lower().strip()):
+                text = line.strip().rstrip(".!")[:100]       # a food I cannot weigh: keep it as a note
+                slug = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:40]
+                store.set_fact(self.user, f"note:{slug}", text, self.day, source="typed", confidence=1.0)
+                return (f"Got it, I'll remember that: \"{text}\". It isn't one of the 44 foods I can weigh yet, so I "
+                        "won't use it to choose, but it is saved in your memory.")
             said = None if got["errors"] else self._converse(line)
             if said:
                 return said

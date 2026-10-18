@@ -133,7 +133,7 @@ def test_help_unknown_and_reset(chat):
     out = chat.handle("what a lovely day")
     assert out.startswith("Okay, fair enough") and "pasta or sprouts?" in out    # friendly, and it says what it can do
     out = chat.handle("I like quinoa bowls")                     # a food it has not learned
-    assert "haven't learned" in out and "pasta or sprouts?" in out
+    assert "I'll remember that" in out and "44 foods" in out       # kept as a note, not dropped
 
 
 def test_it_talks_back_differently_to_different_things(chat):
@@ -146,7 +146,7 @@ def test_it_talks_back_differently_to_different_things(chat):
     replies = [greet, thanks, who, sad, job, other]
     assert len(set(replies)) == len(replies)               # no two different messages get the same reply
     assert greet.startswith("Hey!") and thanks.startswith("Anytime") and "decision partner" in who
-    assert "feeling tired" in sad and "only weigh food choices" in job and "can't keep" in other
+    assert "feeling tired" in sad and "only weigh food choices" in job and "I'll remember that" in other
 
 
 def test_an_open_food_question_is_answered_from_memory(chat):
@@ -161,3 +161,25 @@ def test_an_open_food_question_is_answered_from_memory(chat):
         assert "I don't know much about you yet" in fresh.handle("what should I eat?")
     finally:
         store.reset(chat.user + "x")
+
+
+def test_a_personal_statement_it_cannot_use_is_still_remembered(chat):
+    out = chat.handle("I am a software engineer")
+    assert "I'll remember that" in out
+    notes = {k: v for k, v in tools.get_facts(chat.user, chat.day).items() if k.startswith("note:")}
+    assert [v[0] for v in notes.values()] == ["I am a software engineer"]
+    assert "it is saved" in chat.handle("I'm allergic to peanuts")       # a second, different note
+    assert len([k for k in tools.get_facts(chat.user, chat.day) if k.startswith("note:")]) == 2
+
+
+def test_a_food_it_does_not_know_is_still_remembered_as_a_note(chat):
+    out = chat.handle("I like pizza")
+    assert "I'll remember that" in out and "44 foods" in out
+    assert any(k.startswith("note:") for k in tools.get_facts(chat.user, chat.day))
+
+
+def test_a_question_is_answered_with_what_it_knows_about_you(chat):
+    chat.handle("I am a software engineer")
+    chat.handle("I'm allergic to peanuts")
+    out = chat.handle("should I quit my job?")
+    assert "What I know about you so far" in out and "software engineer" in out and "peanuts" in out

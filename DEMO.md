@@ -37,12 +37,6 @@ for a clean take. Say what each step proves:
 | `paneer wrap or chana chaat?` | `paneer wrap. you like it.` | "The answer flips back, because nothing stale can reach it." |
 | `/history diet_style` and `/at diet_style 8` | `non_veg [superseded] day 1-10` ... `non_veg` | "Time travel: what was true on day 8?" |
 
-**Prefer something to look at?** Run `python ui_server.py`, open http://127.0.0.1:8765 and click **See an example first** (or Menu, then **Play an example**)
-(about 25 seconds; it opens a new blank memory, so nothing of yours is touched). Then, on the Memory tab, drag the **Rewind** slider back
-before day 10 and point at the diet row changing. On the **How I decided** tab, click the decision that said "chana chaat":
-everything not behind that answer dims, and the audit shows `non_veg -> vegetarian`. Open the **Your people** tab to
-set up the 3:25 segment. Run `/day`-style steps in the chat box exactly as in the table.
-
 ### 1:35 to 2:10, the graph itself (FalkorDB Browser, http://localhost:3000)
 
 Select the graph `user_demo` (the graph name is `user_` plus the name you passed to `--user`). Run:
