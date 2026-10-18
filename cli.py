@@ -75,6 +75,66 @@ REMEMBER_GUIDE = (
     "salad bowl and chana chaat (44 in all). Then ask me to choose, like \"pasta or sprouts?\"")
 
 
+def _say(op, line):
+    """One friendly sentence for one memory update. `line` is the engine's plain result for it."""
+    m = re.match(r"I don't know (\w+) yet", line)
+    if m:
+        return f"I haven't met {m[1]} yet, so I skipped that."
+    if line.startswith(("no open", "no active")):
+        return "There was nothing like that open, so I left it alone."
+    k = op["op"]
+    if k == "set_fact":
+        key, value = op["key"], op["value"]
+        if key == "diet_style":
+            return {"non_veg": "Got it, you eat meat.",
+                    "vegetarian": "Got it, you're vegetarian now."}.get(
+                        value, f"Got it, you're {value.replace('_', ' ')}.")
+        if key.startswith("likes:"):
+            food = key.split(":", 1)[1].replace("_", " ")
+            return f"Nice, I'll remember you love {food}." if value == "yes" else \
+                f"Okay, noted that you're not into {food} anymore."
+        if key.startswith("dislikes:"):
+            return f"Understood, you don't like {key.split(':', 1)[1].replace('_', ' ')}."
+        if key == "lives_in":
+            return f"Got it, you're living in the {value} now."
+        if key.startswith("contact:") and key.endswith(":status"):
+            return f"Okay, things with {key.split(':')[1].title()} are {value} right now."
+        if key.startswith("contact:") and key.endswith(":city"):
+            return f"Okay, {key.split(':')[1].title()} lives in {value}."
+        return f"Got it, your {key.replace('_', ' ')} is {value}."
+    if k == "retract_fact":
+        return "No problem, I've taken that back and I won't use it any more."
+    if k == "start_goal":
+        return f"Good call. I'll keep your {op['tag']} goal in mind."
+    if k == "end_goal":
+        return f"Okay, I've closed your {op['tag']} goal."
+    if k == "log_event":
+        return {"clean_day": "Nice work, that's a good day to have on record.",
+                "slip": "That's okay, everyone slips. I've noted it."}.get(
+                    op["kind"], "Okay, I've noted that.")
+    if k == "make_promise":
+        return f"Okay, I'll remember you promised to {op['text']}."
+    if k == "mark_promise":
+        return "Well done for keeping your promise." if op["status"] == "kept" else \
+            "Thanks for being honest about that. I've noted it."
+    if k == "add_contact":
+        return f"Nice, I'll remember {op['name'].title()} is your {op['relation']}."
+    if k == "log_interaction":
+        return f"Thanks for telling me. I've noted that {line}."
+    if k in ("add_value", "end_value"):
+        return "That says a lot about you. I'll keep it in mind." if k == "add_value" else \
+            "Okay, I'll stop treating that as one of your values."
+    return "Got it."
+
+
+def _friendly(ops, lines):
+    """Talk back like a person: what was understood, in plain sentences, then the exact details saved."""
+    said = [_say(o, ln) for o, ln in zip(ops, lines)] if len(ops) == len(lines) else ["Got it."]
+    if any("no longer true" in ln for ln in lines):
+        said.append("I've set aside the older version, so I won't use it for decisions.")
+    return " ".join(said) + " (saved: " + "; ".join(lines) + ".)"
+
+
 class Session:
     def __init__(self, user="you", day=1, auto=False, mode="rules"):
         self.user, self.day, self.auto, self.mode = user, day, auto, mode
@@ -85,7 +145,7 @@ class Session:
 
     # -- helpers --
     def _apply(self, ops):
-        return "Okay, noted: " + "; ".join(extract.apply_ops(self.user, ops, self.day)) + "."
+        return _friendly(ops, extract.apply_ops(self.user, ops, self.day))
 
     def _ask(self, names, add_skip):
         res = decide.decide(self.user, self.day, names, add_skip=add_skip, mode=self.mode)
@@ -161,7 +221,7 @@ class Session:
             return f"Okay, I haven't met {sit['contact']} yet. Tell me who they are first, like 'my friend {sit['contact']} ...'"
         res = counsel.counsel(self.user, cid, self.day, kind=sit["kind"], options=sit["options"])
         self.last_decision = {"decision_id": res["decision_id"], "pick": res["verdict"]}
-        head = f"(noted: {'; '.join(notes)})\n" if notes else ""
+        head = f"Thanks for telling me. I've noted: {'; '.join(notes)}.\n" if notes else ""
         head = head.replace("noted: noted", "noted")
         return (f"{head}{res['text']}\n[{res['decision_id']}: confidence {res['confidence']}; "
                 f"/why, then /outcome good|mixed|bad later]")
@@ -188,7 +248,7 @@ class Session:
         got = extract.extract(line, self.day, contacts=self._contact_names())
         msgs = [f"(skipped: {e})" for e in got["errors"]]
         if not got["ops"]:
-            return "\n".join(msgs + ["Okay, no worries. I couldn't turn that into something to remember.", REMEMBER_GUIDE])
+            return "\n".join(msgs + ["Okay, fair enough! I can't turn that into something I remember yet, but I'm happy to listen.", REMEMBER_GUIDE])
         sure, unsure = extract.split_by_confidence(got["ops"])
         if unsure:
             self.pending = unsure + ([] if self.auto else sure)

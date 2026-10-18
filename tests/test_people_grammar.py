@@ -219,7 +219,7 @@ def chat(user, monkeypatch):
 
 def test_asking_about_a_new_friend_introduces_logs_and_advises(chat, user):
     out = chat.handle("my friend Priya cancelled again, should I say something?")
-    assert out.startswith("(noted: added Priya (friend); Priya cancelled)")
+    assert out.startswith("Thanks for telling me. I've noted: added Priya (friend); Priya cancelled.")
     assert "This one is your call" in out or "Let this one go" in out
     assert [c["name"] for c in tools.list_contacts(user)] == ["Priya"]
 

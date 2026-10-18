@@ -27,9 +27,9 @@ for a clean take. Say what each step proves:
 
 | You type | What appears | What to say |
 |---|---|---|
-| `I eat meat again` / `I love fried chicken` / `I love paneer wrap` | `Okay, noted: diet_style = non_veg` ... | "It turns sentences into memory operations; a whitelist checks them first." |
+| `I eat meat again` / `I love fried chicken` / `I love paneer wrap` | `Got it, you eat meat. (saved: diet_style = non_veg.)` ... | "It turns sentences into memory operations; a whitelist checks them first." |
 | `fried chicken or chana chaat?` | `fried chicken. you like it.` | "No goals yet, so it follows taste." |
-| `/day 10` then `I turned vegetarian` | `Okay, noted: diet_style = vegetarian.` | "A new value **supersedes** the old one." |
+| `/day 10` then `I turned vegetarian` | `Got it, you're vegetarian now. ... (saved: diet_style = vegetarian)` | "A new value **supersedes** the old one." |
 | `fried chicken or chana chaat?` | `chana chaat. you are vegetarian. (you said vegetarian on day 10; before that non veg)` | "The old fact is kept as history, never used." |
 | `/why` | `graph path Person -> Decision: length 1` and `non_veg[superseded] -> vegetarian[active]` | "Every answer is auditable in the graph." |
 | `/day 12`, `I hate paneer wrap`, `paneer wrap or chana chaat?` | `chana chaat. you dislike it.` | "Now it believes a mistaken dislike." |

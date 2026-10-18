@@ -75,7 +75,7 @@ def test_without_auto_changes_wait_for_a_yes(user, monkeypatch):
     s = cli.Session(user, day=3, auto=False)
     out = s.handle("I turned vegetarian")
     assert "OK? (y/n)" in out and tools.get_facts(user, 3) == {}
-    assert s.handle("y").startswith("Okay, noted:")
+    assert "(saved:" in s.handle("y")
     assert tools.get_fact(user, "diet_style", 3)[0] == "vegetarian"
     s.handle("I love pasta")
     assert s.handle("n") == "OK, nothing written."
@@ -110,7 +110,7 @@ def test_relative_date_cannot_rewrite_history(chat):
     chat.handle("I eat meat again yesterday")   # would be day 11: after the last write, fine
     chat.handle("/day 13")
     out = chat.handle("I turned vegetarian 9 days ago")   # day 4 < last write: clamped
-    assert out.startswith("Okay, noted:")
+    assert "(saved:" in out
     assert [h["valid_from"] for h in tools.fact_history(chat.user, "diet_style")][-1] >= 11
 
 
@@ -131,6 +131,6 @@ def test_help_unknown_and_reset(chat):
     chat.handle("/reset")
     assert chat.handle("/facts") == "(nothing yet)"
     out = chat.handle("what a lovely day")
-    assert out.startswith("Okay, no worries") and "pasta or sprouts?" in out    # friendly, and it says what it can do
+    assert out.startswith("Okay, fair enough") and "pasta or sprouts?" in out    # friendly, and it says what it can do
     out = chat.handle("I like quinoa bowls")                     # a food it has not learned
     assert "haven't learned" in out and "pasta or sprouts?" in out
