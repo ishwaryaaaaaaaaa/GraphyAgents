@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisive agent</title>
+<style>
+  :root {
+    --bg: #faf7f2; --surface: #ffffff; --ink: #1c1c1c; --muted: #6b6f6b; --line: #e8e1d4; --chip: #f2ede2;
+    --sage: #8ca38f; --sand: #dac9a5; --sand-bg: #f3ecdd; --bubble: #4d625e; --bubble-fg: #ffffff;
+    --accent: #1c1c1c; --accent-fg: #faf7f2; --go: #5e7350; --go-fg: #ffffff;
+    --active: #4f6b45; --active-bg: #e4ecdc; --superseded: #8a857a; --superseded-bg: #efeadf;
+    --retracted: #b4553b; --retracted-bg: #f6e0d6; --invalidated: #a8741a; --invalidated-bg: #f5e7c4;
+    --derived: #7b6a9b; --used: #4f6f8f; --warn: #a8741a; --warn-bg: #f5e7c4;
+    --shadow: 0 1px 2px rgba(60,50,30,.05), 0 12px 32px rgba(60,50,30,.07);
+    /* the graph is drawn on a dark canvas with vivid colours so the highlighted path stands out */
+    --g-bg: #1a1f1d; --g-card: #26302c; --g-text: #f2efe8; --g-muted: #98a39d;
+    --g-active: #7ee2a0; --g-superseded: #9ba6b2; --g-retracted: #ff7f6e; --g-invalidated: #ffcb5c; --g-derived: #bda3ff; --g-used: #6ec8ff;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151410; --surface: #1d1c17; --ink: #f1ede4; --muted: #a29e92; --line: #2f2d25; --chip: #26241d;
+            --sage: #8ca38f; --sand: #cdb98e; --sand-bg: #2b261b; --bubble: #3c504b; --bubble-fg: #f6f3ec;
+            --accent: #f1ede4; --accent-fg: #151410; --go: #9dbb8b; --go-fg: #151410;
+            --active: #a3c28f; --active-bg: #26301f; --superseded: #9a9588; --superseded-bg: #26241d;
+            --retracted: #e29a82; --retracted-bg: #3a241c; --invalidated: #e2b25c; --invalidated-bg: #352a12;
+            --derived: #b7a6db; --used: #8fb0cc; --warn: #e2b25c; --warn-bg: #352a12;
+            --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35); }
+  }
+  * { box-sizing: border-box; }
+  html { height: 100%; }
+  body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body.app { height: 100vh; overflow: hidden; display: flex; }
+  h1, h2, h3, .serif { font-family: var(--serif); font-weight: 500; letter-spacing: -.015em; }
+  input, button, select { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  button { padding: 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s, transform .05s; }
+  button:hover { border-color: var(--ink); }
+  button:active { transform: translateY(1px); }
+  button.dark { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+  button.go { background: var(--go); color: var(--go-fg); border-color: var(--go); font-weight: 600; }
+  button.big { padding: 14px 26px; font-size: 16.5px; }
+  button.ghost { color: var(--muted); }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible, a:focus-visible { outline: 2px solid var(--olive, var(--go)); outline-offset: 2px; }
+  a { color: inherit; }
+  .hint { color: var(--muted); font-size: 13.5px; }
+  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .logo { font-family: var(--serif); font-size: 26px; letter-spacing: -.02em; }
+
+  /* ================= landing ================= */
+  #landing { max-width: 1180px; margin: 0 auto; padding: 22px 28px 40px; }
+  .nav { display: flex; align-items: center; gap: 30px; }
+  .nav .logo { margin-right: 8px; }
+  .nav a.l { text-decoration: none; color: var(--muted); font-size: 14.5px; }
+  .nav a.l:hover { color: var(--ink); }
+  .nav .sp { flex: 1; }
+  @media (max-width: 760px) { .nav a.l { display: none; } }
+  .hero { display: grid; grid-template-columns: 1.08fr .92fr; gap: 44px; align-items: center; padding: 60px 0 40px; }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } }
+  .hero h1 { font-size: clamp(42px, 6.6vw, 80px); line-height: .99; margin: 20px 0 22px; }
+  .hero h1 em { font-style: italic; color: var(--terra); }
+  .hero p.sub { font-size: 19px; color: var(--muted); max-width: 540px; margin: 0 0 30px; }
+  .cta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .fine { margin-top: 18px; color: var(--muted); font-size: 14px; }
+  /* hero art: layered frosted panels with live-looking belief chips */
+  .art { position: relative; height: 470px; border-radius: 24px; background: linear-gradient(160deg, var(--sand-bg), var(--bg)); overflow: hidden; border: 1px solid var(--line); }
+  .art .panel { position: absolute; border-radius: 18px; box-shadow: var(--shadow); transform: skewY(-6deg); }
+  .art .p1 { left: 6%; top: 10%; width: 40%; height: 70%; background: url(https://images.unsplash.com/photo-1752937878411-84d3c68ccb76?auto=format&fit=crop&w=900&q=75) center/cover no-repeat, linear-gradient(170deg, #b7c7b1, #6f8a6c); }
+  .art .p2 { left: 24%; top: 5%; width: 32%; height: 72%; background: url(https://images.unsplash.com/photo-1783685158361-a82d34288149?auto=format&fit=crop&w=900&q=75) center/cover no-repeat, linear-gradient(170deg, rgba(218,201,165,.85), rgba(184,121,98,.55)); }
+  .art .p3 { left: 38%; top: 15%; width: 28%; height: 66%; background: linear-gradient(170deg, rgba(255,255,255,.55), rgba(140,163,143,.4)); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.6); }
+  .art .axis { position: absolute; right: 11%; top: 12%; bottom: 14%; width: 2px; background: var(--line); }
+  .art .dot { position: absolute; right: calc(11% - 4px); width: 10px; height: 10px; border-radius: 50%; background: var(--sage); }
+  .art .dot.now { background: var(--ink); }
+  .art .lab { position: absolute; right: 3%; font-size: 12.5px; color: var(--muted); }
+  .art .cap { position: absolute; left: 7%; bottom: 6%; font-family: var(--serif); font-style: italic; font-size: 21px; color: var(--muted); }
+  .art .belief { position: absolute; left: 5%; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 9px 13px; box-shadow: var(--shadow); font-size: 13.5px; }
+  .art .belief b { font-weight: 600; } .art .belief small { color: var(--muted); }
+  .art .belief.old { top: 18%; opacity: .78; } .art .belief.old b { text-decoration: line-through; color: var(--muted); }
+  .art .belief.new { top: 31%; left: 12%; border-color: var(--sage); }
+  .art .tag { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .art .tag.rep { background: var(--chip); color: var(--muted); } .art .tag.now { background: var(--active-bg); color: var(--active); }
+  .proof { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); margin-top: 18px; }
+  @media (max-width: 900px) { .proof { grid-template-columns: repeat(2, 1fr); } }
+  .stat { padding: 22px 24px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: none; }
+  @media (max-width: 900px) { .stat:nth-child(2) { border-right: none; } .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); } }
+  .stat b { display: block; white-space: nowrap; font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 3.1vw, 40px); letter-spacing: -.02em; line-height: 1.05; }
+  .stat span { display: block; margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+  .stat em { font-style: normal; color: var(--retracted); font-weight: 600; }
+  .note-proof { margin: 10px 4px 0; color: var(--muted); font-size: 12.5px; }
+  .sect { margin-top: 110px; }
+  .sect .eyebrow { display: block; margin-bottom: 8px; }
+  .sect h2 { font-size: clamp(32px, 4.4vw, 54px); margin: 0 0 14px; line-height: 1.04; max-width: 15em; }
+  .sect > p.lede { color: var(--muted); max-width: 640px; margin: 0 0 30px; font-size: 18px; }
+  .scen { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 860px) { .scen { grid-template-columns: 1fr; } }
+  .sc { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 24px; box-shadow: var(--shadow); }
+  .sc h3 { margin: 0 0 14px; font-size: 24px; }
+  .sc .tl2 { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .sc .tl2 span { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13.5px; }
+  .sc .tl2 span.q { background: var(--sand-bg); font-weight: 600; }
+  .ans { border-radius: 16px; padding: 14px 16px; margin-top: 10px; }
+  .ans small { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+  .ans p { margin: 0; font-size: 15.5px; }
+  .ans.bad { background: var(--retracted-bg); } .ans.bad small { color: var(--retracted); } .ans.bad p { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--retracted); }
+  .ans.good { background: var(--active-bg); } .ans.good small { color: var(--active); } .ans.good p { font-weight: 600; }
+  .steps4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; counter-reset: s; position: relative; }
+  @media (max-width: 900px) { .steps4 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .steps4 { grid-template-columns: 1fr; } }
+  .st { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 20px; position: relative; }
+  .st::before { counter-increment: s; content: "0" counter(s); font-family: var(--serif); font-size: 34px; color: var(--sage); display: block; line-height: 1; margin-bottom: 12px; }
+  .st h3 { margin: 0 0 6px; font-size: 21px; } .st p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .feat6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .feat6 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .feat6 { grid-template-columns: 1fr; } }
+  .fc { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 22px; transition: transform .15s, box-shadow .15s; }
+  .fc:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .fc .ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 20px; margin-bottom: 14px; }
+  .fc:nth-child(1) .ic { background: var(--active-bg); color: var(--active); } .fc:nth-child(2) .ic { background: var(--sand-bg); color: var(--invalidated); }
+  .fc:nth-child(3) .ic { background: #e3ecf4; color: #4f6f8f; } .fc:nth-child(4) .ic { background: var(--retracted-bg); color: var(--retracted); }
+  .fc:nth-child(5) .ic { background: #ece6f6; color: #7b6a9b; } .fc:nth-child(6) .ic { background: var(--chip); color: var(--bubble); }
+  .fc h3 { margin: 0 0 6px; font-size: 21px; } .fc p { margin: 0; color: var(--muted); font-size: 15px; }
+  .show { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .show { grid-template-columns: 1fr; gap: 28px; } }
+  .show ul { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 14px; }
+  .show li { display: flex; gap: 12px; color: var(--muted); } .show li b { color: var(--ink); }
+  .show li::before { content: "✓"; flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--active-bg); color: var(--active); display: grid; place-items: center; font-weight: 700; font-size: 13px; margin-top: 2px; }
+  .mock { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); overflow: hidden; }
+  .mock .top { display: grid; grid-template-columns: 1.1fr 1fr; }
+  @media (max-width: 560px) { .mock .top { grid-template-columns: 1fr; } }
+  .mock .l { background: var(--sand-bg); padding: 22px; } .mock .r { padding: 22px; }
+  .mock .k { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .mock .pk { font-family: var(--serif); font-size: 34px; line-height: 1.08; margin: 6px 0 10px; }
+  .mock .bc { color: var(--ink); font-size: 15px; }
+  .mock h5 { margin: 0 0 8px; font-family: var(--serif); font-size: 20px; font-weight: 500; }
+  .mock ul { margin: 0; padding-left: 18px; font-size: 14.5px; } .mock li { margin: 5px 0; }
+  .mock .ft { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; }
+  .band { margin-top: 110px; border-radius: 30px; background: var(--ink); color: var(--bg); padding: 64px 32px; text-align: center; position: relative; overflow: hidden; }
+  .band h2 { font-size: clamp(34px, 5vw, 60px); margin: 0 auto 14px; max-width: 14em; line-height: 1.04; }
+  .band p { margin: 0 auto 28px; color: #c9c5bb; max-width: 520px; font-size: 18px; }
+  .band .cta { justify-content: center; }
+  .band button.light { background: var(--bg); color: var(--ink); border-color: var(--bg); font-weight: 600; }
+  .band button.line { background: transparent; color: var(--bg); border-color: #6b6f6b; }
+  @media (prefers-color-scheme: dark) { .band { background: #232018; } }
+  footer.ft { margin-top: 44px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 18px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  /* ================= app shell ================= */
+  #app { flex: 1; min-width: 0; display: grid; grid-template-columns: 236px minmax(0, 1fr); }
+  aside.side { background: var(--surface); border-right: 1px solid var(--line); padding: 20px 12px 14px; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; }
+  aside.side .logo { padding: 0 12px 14px; }
+  .side nav { display: grid; gap: 2px; }
+  .side nav button { display: flex; gap: 12px; align-items: center; text-align: left; border: none; background: none; border-radius: 12px; padding: 10px 12px; color: var(--ink); }
+  .side nav button span.i { width: 20px; text-align: center; color: var(--muted); }
+  .side nav button:hover { background: var(--chip); }
+  .side nav button[aria-current=page] { background: var(--sand-bg); font-weight: 600; }
+  .side h6 { margin: 18px 12px 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .side .recent { display: grid; gap: 1px; }
+  .side .recent button { border: none; background: none; text-align: left; border-radius: 10px; padding: 7px 12px; font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; }
+  .side .recent button small { display: block; color: var(--muted); font-size: 11.5px; }
+  .side .recent button:hover { background: var(--chip); }
+  .side .who { margin-top: auto; display: flex; gap: 10px; align-items: center; padding: 12px; border-top: 1px solid var(--line); }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--sage); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .side .who b { display: block; font-size: 14px; line-height: 1.2; } .side .who span { color: var(--muted); font-size: 12px; }
+  .content { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .topbar { display: flex; align-items: center; gap: 10px 14px; padding: 12px 28px; border-bottom: 1px solid var(--line); flex-wrap: wrap; justify-content: flex-end; }
+  .topbar .sp { flex: 1; }
+  .daypill { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .daypill b { color: var(--ink); font-size: 15px; }
+  .page { flex: 1; min-height: 0; overflow: auto; padding: 26px 32px 32px; }
+  .page h1.pt { font-size: 38px; margin: 0 0 4px; }
+  .page .lead { color: var(--muted); margin: 0 0 20px; max-width: 760px; }
+  .view { height: 100%; }
+  @media (max-width: 900px) {
+    body.app { height: auto; overflow: visible; display: block; }
+    #app { display: block; }
+    aside.side { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-right: none; border-bottom: 1px solid var(--line); overflow: visible; }
+    aside.side .logo { padding: 0 8px 0 0; } .side nav { display: flex; flex-wrap: wrap; } .side h6, .side .recent, .side .who { display: none; }
+    .page { overflow: visible; padding: 18px 14px 28px; } .view { height: auto; } .topbar { padding: 10px 14px; }
+  }
+
+  /* chat page */
+  .chatwrap { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 22px; height: 100%; }
+  @media (max-width: 1180px) { .chatwrap { grid-template-columns: 1fr; } .ctx { display: none; } }
+  .chatcol { display: flex; flex-direction: column; min-height: 0; }
+  #log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 4px 4px 14px; }
+  @media (max-width: 900px) { .chatcol { height: auto; } #log { min-height: 320px; max-height: 60vh; } .chatwrap { height: auto; } }
+  .msg { flex: none; max-width: 86%; padding: 12px 16px; border-radius: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .me { align-self: flex-end; background: var(--bubble); color: var(--bubble-fg); border-bottom-right-radius: 6px; }
+  .bot { align-self: flex-start; background: var(--sand-bg); border-bottom-left-radius: 6px; }
+  .bot.err { background: var(--retracted-bg); color: var(--retracted); }
+  .note { align-self: center; color: var(--muted); font-size: 13px; background: none; padding: 2px 8px; }
+  .welcome { background: none; padding: 0; max-width: 100%; align-self: stretch; white-space: normal; }
+  .welcome h2 { margin: 0 0 4px; font-size: 30px; }
+  .welcome p { margin: 0 0 14px; color: var(--muted); }
+  .starters { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .starter { border: 1px solid var(--line); border-radius: 18px; padding: 14px 14px 12px; background: var(--surface); }
+  .starter h4 { margin: 0 0 8px; font-size: 14.5px; } .starter h4 span { color: var(--muted); font-weight: 400; display: block; font-size: 12.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13.5px; cursor: pointer; }
+  .chip.static { cursor: default; } .chip[aria-pressed=true] { border-color: var(--ink); font-weight: 600; }
+  .decision { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 0; width: 100%; max-width: 100%; overflow: hidden; white-space: normal; }
+  .decision .top { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  @media (max-width: 640px) { .decision .top { grid-template-columns: 1fr; } }
+  .decision .left { padding: 16px 18px; background: var(--sand-bg); }
+  .decision .right { padding: 16px 18px; }
+  .decision .kicker { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .decision .pick { font-family: var(--serif); font-size: 30px; line-height: 1.1; margin: 4px 0 8px; }
+  .decision .because { white-space: pre-wrap; color: var(--ink); font-size: 15px; }
+  .decision .why h5 { margin: 0 0 6px; font-family: var(--serif); font-size: 19px; font-weight: 500; }
+  .decision .why ul { margin: 0; padding-left: 18px; font-size: 14.5px; } .decision .why li { margin: 4px 0; }
+  .conf { display: inline-block; font-size: 11.5px; padding: 1px 9px; border-radius: 999px; background: var(--warn-bg); color: var(--warn); margin-left: 8px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+  .decision .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 18px; border-top: 1px solid var(--line); }
+  .decision .foot .sp { flex: 1; }
+  .rate { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .rate span { color: var(--muted); font-size: 14px; }
+  .rate button, .linkbtn { padding: 5px 13px; font-size: 14px; }
+  .composer { padding-top: 6px; }
+  form.send { display: flex; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 6px 6px 20px; box-shadow: var(--shadow); }
+  form.send input { flex: 1; border: none; background: none; outline: none; min-width: 0; }
+  form.send button { width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 18px; }
+  .ctx { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow: auto; }
+  .ctxcard { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .ctxcard h3 { margin: 0 0 10px; font-size: 20px; }
+  .ctxrow { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .ctxrow:first-of-type { border-top: none; } .ctxrow span:first-child { color: var(--muted); } .ctxrow span:last-child { text-align: right; font-weight: 500; }
+  .qa { display: grid; gap: 8px; }
+  .qa button { display: flex; gap: 12px; align-items: center; text-align: left; border-radius: 14px; padding: 10px 12px; }
+  .qa .qi { width: 30px; height: 30px; border-radius: 9px; background: var(--sand-bg); display: grid; place-items: center; flex: none; color: var(--retracted); }
+
+  /* memory */
+  .sliderbar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .sliderbar label { font-weight: 600; font-size: 14px; }
+  .sliderbar button { width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+  input[type=range] { flex: 1; min-width: 140px; accent-color: var(--go); height: 28px; }
+  #asoflabel { white-space: nowrap; }
+  .tl { display: grid; grid-template-columns: minmax(120px, 210px) minmax(180px, 1fr) minmax(86px, 120px) minmax(86px, 120px); gap: 0 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 8px 18px 10px; }
+  .tl .th { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .1em; padding: 10px 0 6px; display: flex; justify-content: space-between; }
+  .tl .slot { padding: 10px 0; font-weight: 500; font-size: 14.5px; overflow-wrap: anywhere; border-top: 1px solid var(--line); }
+  .tl .track-cell { position: relative; height: 56px; border-top: 1px solid var(--line); }
+  .tl .val { border-top: 1px solid var(--line); height: 56px; display: flex; align-items: center; }
+  .track { position: absolute; left: 0; right: 0; top: 13px; height: 30px; }
+  .seg { position: absolute; top: 0; height: 30px; border-radius: 9px; padding: 0 10px; font-size: 12.5px; line-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1.5px solid currentColor; }
+  .seg.active { color: var(--active); background: var(--active-bg); font-weight: 600; }
+  .seg.superseded { color: var(--superseded); background: var(--superseded-bg); }
+  .seg.retracted { color: var(--retracted); background: repeating-linear-gradient(135deg, var(--retracted-bg) 0 6px, transparent 6px 12px); text-decoration: line-through; }
+  .seg.invalidated { color: var(--invalidated); background: var(--invalidated-bg); }
+  .cursor { position: absolute; top: -13px; bottom: -13px; width: 0; border-left: 2px solid var(--ink); z-index: 2; pointer-events: none; }
+  .vchip { font-size: 13.5px; padding: 4px 11px; border-radius: 9px; background: var(--active-bg); color: var(--active); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-weight: 500; }
+  .vchip.none { color: var(--muted); background: transparent; }
+  .vchip.diff { background: var(--retracted-bg); color: var(--retracted); font-weight: 600; }
+  .badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-left: 8px; font-weight: 500; white-space: nowrap; }
+  .axis { display: flex; justify-content: space-between; }
+  .empty { color: var(--muted); padding: 40px 10px; text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: 18px; }
+  .empty b { display: block; color: var(--ink); font-family: var(--serif); font-weight: 500; font-size: 22px; margin-bottom: 6px; }
+  @media (max-width: 640px) { .tl { grid-template-columns: 90px 1fr 70px 70px; gap: 0 8px; padding: 6px 10px; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+  /* graph */
+  #graphwrap { overflow: auto; border: 1px solid var(--g-bg); border-radius: 18px; background: radial-gradient(900px 420px at 30% 0%, #26312d, var(--g-bg)); height: min(58vh, 620px); min-height: 300px; }
+  svg text { font: 12px system-ui, sans-serif; fill: var(--g-text); }
+  svg .dim { opacity: .22; transition: opacity .2s; }
+  svg .dec { cursor: pointer; }
+  #audit { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; font-size: 14.5px; white-space: pre-wrap; background: var(--sand-bg); }
+
+  /* people */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 18px; padding: 16px; background: var(--surface); box-shadow: var(--shadow); }
+  .card .head { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+  .card h3 { margin: 0; font-size: 22px; }
+  .status { display: inline-block; font-size: 12.5px; padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+  .status.strained { color: var(--retracted); background: var(--retracted-bg); } .status.fine { color: var(--active); background: var(--active-bg); }
+  .status.other { color: var(--muted); background: var(--chip); }
+  h4.sub { margin: 26px 0 10px; font-family: var(--serif); font-weight: 500; font-size: 21px; }
+
+  /* story page */
+  .story { display: grid; grid-template-columns: 1fr .75fr 1.15fr; gap: 0; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); min-height: 420px; }
+  @media (max-width: 1100px) { .story { grid-template-columns: 1.1fr .9fr; } .story .ph { display: none; } }
+  @media (max-width: 860px) { .story { grid-template-columns: 1fr; } }
+  .story .ph { background: url(https://images.unsplash.com/photo-1643148636637-58b3eb95cdad?auto=format&fit=crop&w=1100&q=75) center/cover no-repeat, var(--sand-bg); min-height: 280px; }
+  .story .l { padding: 40px; background: linear-gradient(160deg, var(--sand-bg), var(--surface)); display: flex; flex-direction: column; justify-content: center; }
+  .story h1 { font-size: clamp(36px, 5vw, 58px); line-height: 1.02; margin: 12px 0 14px; }
+  .story p { color: var(--muted); max-width: 420px; margin: 0 0 24px; }
+  .story ol { list-style: none; margin: 0; padding: 36px 34px; position: relative; display: grid; gap: 18px; align-content: center; }
+  .story ol::before { content: ""; position: absolute; left: 44px; top: 44px; bottom: 44px; width: 2px; background: var(--line); }
+  .story li { position: relative; padding-left: 34px; display: grid; grid-template-columns: 62px 1fr; gap: 10px; }
+  .story li::before { content: ""; position: absolute; left: 4px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--sage); }
+  .story li b { font-weight: 600; } .story li span { color: var(--muted); }
+</style>
+</head>
+<body class="landing">
+
+<!-- ====================== landing ====================== -->
+<div id="landing">
+  <div class="nav">
+    <span class="logo">Decisive</span>
+    <a class="l" href="#problem">Product</a><a class="l" href="#how">How it thinks</a><a class="l" href="#proof">Proof</a>
+    <span class="sp"></span>
+    <button class="dark js-start">Get started →</button>
+  </div>
+
+  <section class="hero">
+    <div>
+      <span class="eyebrow">A decision partner whose memory stays current</span>
+      <h1>Stop taking advice from the person you <em>used to be.</em></h1>
+      <p class="sub">Decisive remembers your life, forgets nothing, and acts only on what is true today. When you change your mind, it changes with you, and every answer comes with the receipts.</p>
+      <div class="cta"><button class="dark big js-example">Try the demo →</button><button class="big js-start">Start with a blank memory</button></div>
+      <p class="fine">Starts empty and private to you. Nothing to sign up for.</p>
+    </div>
+    <div class="art" aria-hidden="true">
+      <div class="panel p1"></div><div class="panel p2"></div><div class="panel p3"></div>
+      <div class="belief old"><span class="tag rep">Replaced</span><b>Eats meat</b><small>day 1–9</small></div>
+      <div class="belief new"><span class="tag now">True now</span><b>Vegetarian</b><small>since day 10</small></div>
+      <div class="axis"></div>
+      <div class="dot" style="top:22%"></div><span class="lab" style="top:calc(22% - 10px)">Tomorrow</span>
+      <div class="dot now" style="top:48%"></div><span class="lab" style="top:calc(48% - 10px);color:var(--ink);font-weight:600">Today</span>
+      <div class="dot" style="top:74%"></div><span class="lab" style="top:calc(74% - 10px)">Yesterday</span>
+      <div class="cap">Your memories, in context.</div>
+    </div>
+  </section>
+
+  <div class="proof" id="proof">
+    <div class="stat"><b>3,595 / 3,595</b><span>held-out questions answered from current facts. A "newest write wins" memory got 79%.</span></div>
+    <div class="stat"><b>0</b><span>stale facts used in any answer. The same memory used <em>648</em> of them.</span></div>
+    <div class="stat"><b>100%</b><span>of answers traceable to the exact facts and graph path behind them.</span></div>
+    <div class="stat"><b>0 leaks</b><span>between people, with 16 memories running at once on one database.</span></div>
+  </div>
+  <p class="note-proof">Measured on synthetic lives with an independent checker, on the official FalkorDB server. Method and limits are in the README.</p>
+
+  <section class="sect" id="problem">
+    <span class="eyebrow">The problem</span>
+    <h2>A memory that only adds will eventually lie to you.</h2>
+    <p class="lede">People change. Most assistants just pile new facts on top of old ones, so yesterday's you keeps voting on today's decisions. Decisive gives every fact a life, and only the living ones get a say.</p>
+    <div class="scen">
+      <div class="sc">
+        <h3>You changed. Did it?</h3>
+        <div class="tl2"><span>Day 1: "I eat meat"</span><span>Day 10: "I turned vegetarian"</span><span class="q">Day 14: "What should I order?"</span></div>
+        <div class="ans bad"><small>A typical assistant (illustrative)</small><p>"The butter chicken, you love it."</p></div>
+        <div class="ans good"><small>Decisive</small><p>"Go vegetarian. You changed on day 10, and the old fact is history, not advice."</p></div>
+      </div>
+      <div class="sc">
+        <h3>A friend lets you down.</h3>
+        <div class="tl2"><span>Sam has cancelled before</span><span>Day 40: "Sam cancelled again"</span><span class="q">"Should I say something?"</span></div>
+        <div class="ans bad"><small>A typical assistant (illustrative)</small><p>"You deserve better. Tell them exactly how you feel."</p></div>
+        <div class="ans good"><small>Decisive</small><p>"Let it go. It is the first cancellation in 60 days. If it happens again soon, that is a pattern worth raising."</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sect" id="how">
+    <span class="eyebrow">How it thinks</span>
+    <h2>Four moves, and nothing is ever deleted.</h2>
+    <p class="lede">The memory is a graph, so every fact knows what replaced it, what it was built on, and which decisions used it.</p>
+    <div class="steps4">
+      <div class="st"><h3>Remember</h3><p>Say things in plain words. Each becomes a dated fact: a diet, a goal, a friend, a promise.</p></div>
+      <div class="st"><h3>Replace</h3><p>When something changes, the old fact is kept as history and marked replaced. Retract a mistake and everything built on it goes too.</p></div>
+      <div class="st"><h3>Decide</h3><p>Only facts that are true now reach the decision, weighed by rules you can read and by how past choices turned out.</p></div>
+      <div class="st"><h3>Prove</h3><p>Every answer links to the facts it used and the path through the graph. Rewind to any day to see what it believed.</p></div>
+    </div>
+  </section>
+
+  <section class="sect">
+    <span class="eyebrow">What you get</span>
+    <h2>Six things most assistants cannot do.</h2>
+    <div class="feat6" style="margin-top:28px">
+      <div class="fc"><div class="ic">◉</div><h3>Only what is true now</h3><p>Facts are true, replaced, retracted or invalid. Anything that is not true never reaches an answer.</p></div>
+      <div class="fc"><div class="ic">✎</div><h3>Receipts for every answer</h3><p>Open any decision to see the exact facts behind it and what they replaced. No black box.</p></div>
+      <div class="fc"><div class="ic">◷</div><h3>Time travel</h3><p>Drag a slider to any day and see what it believed then, and why it answered the way it did.</p></div>
+      <div class="fc"><div class="ic">↺</div><h3>Correct a mistake once</h3><p>Say a fact was wrong and it disappears along with every conclusion that depended on it.</p></div>
+      <div class="fc"><div class="ic">↗</div><h3>Learns how it turns out</h3><p>Tell it whether a choice worked. The reasons that led you wrong count for less next time.</p></div>
+      <div class="fc"><div class="ic">☺</div><h3>Judgment about people</h3><p>Advice on friendships grounded in patterns, promises and your own values, not flattery.</p></div>
+    </div>
+  </section>
+
+  <section class="sect">
+    <div class="show">
+      <div>
+        <span class="eyebrow">Show your work</span>
+        <h2>An answer you can check.</h2>
+        <p class="lede" style="margin-bottom:0">Every decision arrives with a plain reason and the facts it rests on. If one of them is wrong, you fix it in a sentence, and the next answer changes.</p>
+        <ul>
+          <li><span><b>A pick and a reason</b> in plain language, with a flag when it is not confident.</span></li>
+          <li><span><b>The facts it used</b>, including what each one replaced.</span></li>
+          <li><span><b>A graph path</b> from you to the decision, one click away.</span></li>
+        </ul>
+      </div>
+      <div class="mock" aria-hidden="true">
+        <div class="top">
+          <div class="l"><div class="k">I'd recommend</div><div class="pk">Go vegetarian</div><div class="bc">You changed your diet on day 10, so the old preference no longer applies.</div></div>
+          <div class="r"><h5>Why?</h5><ul><li>Diet: <b>vegetarian</b> (replacing non veg)</li><li>Goal: <b>eat lighter</b></li><li>Taste: <b>likes paneer</b></li></ul></div>
+        </div>
+        <div class="ft"><span>Did it work out?  Yes · So-so · No</span><span>answered in 9 ms</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="band">
+    <h2>Start with a blank memory.</h2>
+    <p>It takes ten seconds, nothing to sign up for. Tell it one thing about you and watch it use it.</p>
+    <div class="cta"><button class="light big js-start">Get started →</button><button class="line big js-example">Watch the demo first</button></div>
+  </div>
+
+  <footer class="ft"><span>Built for the Graph Hacks hackathon. The memory is a FalkorDB graph. Everything runs on this computer.</span><span>Photos from Unsplash, used under the Unsplash License.</span></footer>
+</div>
+
+<!-- ====================== app ====================== -->
+<div id="app" hidden>
+  <aside class="side">
+    <div class="logo">Decisive</div>
+    <nav id="nav">
+      <button data-view="chat"><span class="i">◌</span>Chat</button>
+      <button data-view="memory"><span class="i">▤</span>Memory</button>
+      <button data-view="graph"><span class="i">⌬</span>Graph</button>
+      <button data-view="people"><span class="i">☺</span>People</button>
+      <button data-view="story"><span class="i">▷</span>Demo story</button>
+    </nav>
+    <h6>Recent decisions</h6>
+    <div class="recent" id="recent"></div>
+    <div class="who"><div class="avatar">Y</div><div><b>You</b><span>Private memory · <span id="uid"></span></span></div></div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <button id="home" class="ghost">← About</button>
+      <span class="sp"></span>
+      <span class="daypill" title="This prototype keeps its own calendar. Press Next day to let a day pass.">Today: day <b id="today">1</b></span>
+      <button id="next">Next day</button>
+      <button id="play" class="dark">▶ Play demo story</button>
+      <button id="reset" class="ghost">Start fresh</button>
+    </div>
+
+    <div class="page">
+      <!-- chat -->
+      <div class="view" id="view-chat">
+        <div class="chatwrap">
+          <div class="chatcol">
+            <div id="log" role="log" aria-live="polite"></div>
+            <div class="composer">
+              <form class="send" id="form">
+                <input id="text" type="text" autocomplete="off" maxlength="500" aria-label="Message" placeholder="Tell me something about you, or ask me to choose…">
+                <button class="go" type="submit" aria-label="Send">➤</button>
+              </form>
+              <p class="hint" style="margin:8px 4px 0">Typed commands: <code>/why</code> <code>/at diet_style 8</code> <code>/history diet_style</code> <code>/outcome good</code></p>
+            </div>
+          </div>
+          <aside class="ctx" aria-label="Current context">
+            <div class="ctxcard"><h3>Current context</h3><div id="ctxrows"></div></div>
+            <div class="ctxcard"><h3>Quick actions</h3>
+              <div class="qa">
+                <button id="qa-explain"><span class="qi">◎</span>Explain my last decision</button>
+                <button id="qa-memory"><span class="qi">▤</span>Show my memory</button>
+                <button id="qa-fix"><span class="qi">✎</span>Correct something</button>
+                <button id="qa-reset"><span class="qi">↺</span>Start fresh</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- memory -->
+      <div class="view" id="view-memory" hidden>
+        <h1 class="pt">Memory</h1>
+        <p class="lead">Everything I currently believe about you, as a timeline. When something changes I keep the old version as history, but only the green one is used to answer.</p>
+        <div class="sliderbar">
+          <label for="asof">Time travel</label>
+          <button id="asof-prev" aria-label="Previous day">‹</button>
+          <input id="asof" type="range" min="1" max="1" value="1">
+          <button id="asof-next" aria-label="Next day">›</button>
+          <b id="asoflabel"></b>
+        </div>
+        <div id="memory"></div>
+      </div>
+
+      <!-- graph -->
+      <div class="view" id="view-graph" hidden>
+        <h1 class="pt">Graph</h1>
+        <p class="lead">The graph behind my answers. Pick a decision to light up the facts it rested on; everything that did not influence it fades.</p>
+        <div class="chips" id="decisions"></div>
+        <div class="legend">
+          <span><i style="background:var(--g-active)"></i>true now</span>
+          <span><i style="background:var(--g-superseded)"></i>replaced</span>
+          <span><i style="background:var(--g-retracted)"></i>retracted (never true)</span>
+          <span><i style="background:var(--g-invalidated)"></i>no longer valid</span>
+          <span><i style="background:var(--g-derived)"></i>follows from</span>
+          <span><i style="background:var(--g-used)"></i>used by a decision</span>
+        </div>
+        <div id="graphwrap"><svg id="svg" role="img" aria-label="Graph of facts and decisions"></svg></div>
+        <div id="audit" hidden></div>
+      </div>
+
+      <!-- people -->
+      <div class="view" id="view-people" hidden>
+        <h1 class="pt">People</h1>
+        <div id="people"></div>
+      </div>
+
+      <!-- story -->
+      <div class="view" id="view-story" hidden>
+        <div class="story">
+          <div class="l">
+            <span class="eyebrow">A walkthrough</span>
+            <h1>A life in fourteen days.</h1>
+            <p>Watch a short story unfold: a diet changes, a mistake is made and corrected, a friend lets someone down. See how the memory changes and how the agent decides, step by step.</p>
+            <div><button id="story-play" class="dark big">▶ Play demo story</button></div>
+            <p class="hint" style="margin-top:14px">It runs in a separate, blank memory. Yours is untouched.</p>
+          </div>
+          <div class="ph" role="img" aria-label="An open notebook with a pen and a cup of coffee on a wooden desk"></div>
+          <ol>
+            <li><b>Day 1</b><span>You say you eat meat and love fried chicken and paneer wrap.</span></li>
+            <li><b>Day 10</b><span>You turn vegetarian. The old fact becomes history.</span></li>
+            <li><b>Day 12</b><span>You mention you hate paneer wrap, which turns out to be a mistake.</span></li>
+            <li><b>Day 14</b><span>You correct it. The wrong fact and everything built on it is dropped.</span></li>
+            <li><b>Then</b><span>The agent helps you decide what to eat, and what to do about a friend who cancelled again.</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+
+// Build DOM without ever parsing HTML: strings become text nodes.
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") e.className = v;
+    else if (k === "style") e.style.cssText = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null) e.append(kid instanceof Node ? kid : String(kid));
+  return e;
+}
+function s(tag, attrs, ...kids) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  for (const kid of kids.flat()) if (kid != null) e.append(kid instanceof Node ? kid : String(kid));
+  return e;
+}
+const nice = (x) => String(x).replace(/_/g, " ");
+const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+const slotName = (k) => cap(nice(k).replace(":", ": "));
+
+// Nobody is pre-loaded. Each browser tab gets its own random, private memory, empty on first open.
+function newId() {
+  const b = new Uint8Array(6); crypto.getRandomValues(b);
+  return "u_" + [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { /* works without storage */ } return null; }
+function myId() { let v = store("memory_id"); if (!v) { v = newId(); store("memory_id", v); } return v; }
+function setId(v) { store("memory_id", v); $("#uid").textContent = v.slice(2, 8); }
+const S = { user: myId(), today: 1, asOf: 1, focus: null, playing: false, view: "chat" };
+
+async function api(path, body) {
+  const opts = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+const U = () => encodeURIComponent(S.user);
+
+// ---- landing <-> app, and the app's pages -------------------------------------------------
+const VIEWS = ["chat", "memory", "graph", "people", "story"];
+function showView(name) {
+  S.view = name;
+  VIEWS.forEach((v) => { $("#view-" + v).hidden = v !== name; });
+  document.querySelectorAll("#nav button").forEach((b) => { if (b.dataset.view === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  if (name === "graph") drawGraph();
+  if (name === "chat") $("#log").scrollTop = $("#log").scrollHeight;
+  $(".page").scrollTop = 0;
+}
+function showApp(view) {
+  store("started", "1");
+  $("#landing").hidden = true; $("#app").hidden = false;
+  document.body.className = "app";
+  window.scrollTo(0, 0);
+  if (!$("#log").children.length) welcome();
+  showView(view || S.view || "chat");
+  refreshAll().catch((e) => addMsg("bot err", "Could not reach the server: " + e.message));
+}
+function showLanding() {
+  store("started", "0");
+  $("#app").hidden = true; $("#landing").hidden = false;
+  document.body.className = "landing";
+}
+document.querySelectorAll("#nav button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+
+// ---- chat -------------------------------------------------------------------------------
+function addMsg(role, text, extra) {
+  const m = h("div", { class: "msg " + role }, text);
+  if (extra) m.append(extra);
+  $("#log").append(m);
+  $("#log").scrollTop = $("#log").scrollHeight;
+  return m;
+}
+function note(text) { addMsg("note", text); }
+
+// A decision is a card: the pick, a plain reason, why (the facts it rests on), and a way to say how it went.
+async function decisionCard(reply, id, ms) {
+  const a = await api("/api/why?user=" + U() + "&decision=" + encodeURIComponent(id));
+  const confMatch = reply.match(/confidence (\w+)/i);
+  let body = reply.replace(/\s*\[d\d+:[^\]]*\]\s*/g, " ").trim();
+  const counsel = a.mode === "counsel";
+  if (!counsel) {
+    const first = nice(a.pick).toLowerCase();
+    if (body.toLowerCase().startsWith(first)) body = body.slice(first.length).replace(/^[.\s]+/, "");
+    body = body ? cap(body) : "No stored facts mattered here, so I used my defaults.";
+  }
+  const why = [];
+  a.used.forEach((u) => {
+    const before = u.history.length > 1 ? u.history[u.history.length - 2].value : null;
+    why.push(h("li", {}, slotName(u.key) + ": ", h("b", {}, nice(u.value)), before ? " (replacing " + nice(before) + ")" : ""));
+  });
+  if (counsel) a.rules.forEach((r) => why.push(h("li", {}, cap(nice(r)))));
+  const rate = h("div", { class: "rate" }, h("span", {}, "Did it work out?"),
+    ...[["good", "Yes"], ["mixed", "So-so"], ["bad", "No"]].map(([k, label]) => h("button", { onclick: () => rateLast(k, rate) }, label)));
+  const card = h("div", { class: "msg bot decision" },
+    h("div", { class: "top" },
+      h("div", { class: "left" },
+        h("div", { class: "kicker" }, counsel ? "My advice" : "I'd recommend", confMatch && confMatch[1].toLowerCase() !== "high" ? h("span", { class: "conf" }, confMatch[1] + " confidence") : null),
+        h("div", { class: "pick" }, cap(nice(a.pick))),
+        h("div", { class: "because" }, body)),
+      h("div", { class: "right why" }, h("h5", {}, counsel ? "Principles I applied" : "Why?"),
+        h("ul", {}, why.length ? why : h("li", { class: "hint" }, "Nothing stored yet.")))),
+    h("div", { class: "foot" }, rate, h("span", { class: "sp" }),
+      ms != null ? h("span", { class: "hint", title: "time the agent took to answer" }, "answered in " + ms + " ms") : null,
+      h("button", { class: "linkbtn", onclick: () => { S.focus = id; showView("graph"); loadAudit(); } }, "See how I decided →")));
+  document.querySelectorAll(".rate").forEach((r) => { if (r !== rate) r.remove(); });   // only the latest choice can be rated
+  $("#log").append(card);
+  $("#log").scrollTop = $("#log").scrollHeight;
+}
+async function rateLast(result, box) {
+  try {
+    await api("/api/say", { user: S.user, text: "/outcome " + result });
+    box.replaceChildren(h("span", {}, result === "good" ? "Glad it worked. I will lean on that next time." : result === "bad" ? "Thanks, I will weigh that factor less next time." : "Thanks, noted."));
+    await refreshAll();
+  } catch (e) { addMsg("bot err", "Error: " + e.message); }
+}
+
+async function send(text, opts) {
+  text = text.trim();
+  if (!text) return;
+  const quiet = opts && opts.quiet;
+  if (S.view !== "chat") showView("chat");
+  document.querySelectorAll(".welcome").forEach((w) => w.remove());       // the starter suggestions have done their job
+  if (!quiet) addMsg("me", text);
+  try {
+    const t0 = performance.now();
+    const r = await api("/api/say", { user: S.user, text });
+    const ms = Math.max(1, Math.round(performance.now() - t0));
+    if (r.focus) {
+      S.focus = r.focus;
+      try { await decisionCard(r.reply || "", r.focus, ms); } catch (e) { addMsg("bot", r.reply || "(no reply)"); }
+    } else if (quiet) note(r.reply || "");
+    else addMsg("bot", r.reply || "(no reply)");
+    S.today = r.today;
+    await refreshAll();
+  } catch (e) {
+    addMsg("bot err", "Error: " + e.message);
+  }
+}
+
+function welcome() {
+  const starter = (title, sub, lines) => h("div", { class: "starter" }, h("h4", {}, title, h("span", {}, sub)),
+    h("div", { class: "chips" }, lines.map((t) => h("button", { class: "chip", type: "button", onclick: () => send(t) }, t))));
+  $("#log").append(h("div", { class: "msg welcome" },
+    h("h2", {}, "Hi, I'm your decision partner."),
+    h("p", {}, "My memory of you is empty, so let's start. Say anything in plain words, or tap a suggestion."),
+    h("div", { class: "starters" },
+      starter("1. Tell me about you", "each tap teaches me something", ["I eat meat again", "I love fried chicken", "I hate paneer wrap"]),
+      starter("2. Ask me to choose", "I only use what is true now", ["fried chicken or chana chaat?"]),
+      starter("3. Change something", "and watch my answer change", ["I turned vegetarian", "fried chicken or chana chaat?", "that was wrong about paneer wrap"]),
+      starter("Or ask about a friend", "advice with judgment", ["my friend Sam cancelled again, should I say something?"]))));
+}
+
+// ---- refresh ----------------------------------------------------------------------------
+async function refreshAll() {
+  const st = await api("/api/state?user=" + U());
+  const wasLatest = S.asOf >= S.today;
+  S.today = st.today;
+  $("#today").textContent = S.today;
+  const slider = $("#asof");
+  slider.max = Math.max(1, S.today);
+  if (wasLatest || S.asOf > S.today) S.asOf = S.today;
+  slider.value = S.asOf;
+  await Promise.all([loadMemory(), loadGraph(), loadPeople(), loadContext()]);
+}
+
+async function loadContext() {
+  const m = await api("/api/memory?user=" + U() + "&as_of=" + S.today);
+  const box = $("#ctxrows");
+  box.replaceChildren();
+  const known = m.rows.filter((r) => r.now != null);
+  box.append(h("div", { class: "ctxrow" }, h("span", {}, "Today"), h("span", {}, "Day " + m.today)));
+  if (!known.length) { box.append(h("p", { class: "hint", style: "margin:8px 0 0" }, "Nothing yet. Everything I learn about you appears here.")); return; }
+  known.forEach((r) => box.append(h("div", { class: "ctxrow" }, h("span", {}, slotName(r.key)), h("span", {}, nice(r.now)))));
+}
+
+// ---- memory timeline ----------------------------------------------------------------------
+async function loadMemory() {
+  const m = await api("/api/memory?user=" + U() + "&as_of=" + S.asOf);
+  $("#asoflabel").textContent = S.asOf === m.today ? "today · day " + m.today : "day " + S.asOf;
+  const box = $("#memory");
+  box.replaceChildren();
+  if (!m.rows.length) {
+    box.append(h("div", { class: "empty" }, h("b", {}, "Nothing here yet"), "As you tell me things, they appear here. Try \"I eat meat again\" in the chat."));
+    return;
+  }
+  const T = Math.max(m.today, 2);
+  const pct = (d) => Math.max(0, Math.min(100, ((d - 1) / (T - 1)) * 100));
+  const grid = h("div", { class: "tl" },
+    h("div", { class: "th" }, "About"),
+    h("div", { class: "th axis" }, h("span", {}, "day 1"), h("span", {}, "day " + T)),
+    h("div", { class: "th" }, "Day " + S.asOf), h("div", { class: "th" }, "Now"));
+  m.rows.forEach((r) => {
+    const changed = (r.as_of ?? null) !== (r.now ?? null);
+    const track = h("div", { class: "track" });
+    r.history.forEach((x) => {
+      const from = pct(x.valid_from), end = pct(x.valid_to ?? T);
+      const width = Math.max(end - from, 9);
+      const left = Math.min(from, 100 - width);
+      track.append(h("div", { class: "seg " + x.status, style: "left:" + left + "%;width:" + width + "%",
+        title: nice(x.value) + " · " + x.status + " · day " + x.valid_from + (x.valid_to != null ? " to " + x.valid_to : " onward") }, nice(x.value)));
+    });
+    track.append(h("div", { class: "cursor", style: "left:" + pct(S.asOf) + "%", "aria-hidden": "true" }));
+    const chip = (v, diff) => h("span", { class: "vchip" + (v == null ? " none" : "") + (diff && v != null ? " diff" : ""), title: v == null ? "not known on this day" : nice(v) }, v == null ? "—" : nice(v));
+    grid.append(
+      h("div", { class: "slot" }, slotName(r.key), r.derived ? h("span", { class: "badge", title: "exists only because of another fact" }, "derived") : null),
+      h("div", { class: "track-cell" }, track),
+      h("div", { class: "val" }, chip(r.as_of, changed)), h("div", { class: "val" }, chip(r.now, false)));
+  });
+  box.append(grid);
+  box.append(h("p", { class: "hint", style: "margin-top:12px" }, "The dark line is the day you picked. Red means what I believed then differs from today. Striped, struck-through boxes were retracted: I decided they were never true."));
+}
+
+// ---- graph ------------------------------------------------------------------------------
+const COLORS = { active: "var(--g-active)", superseded: "var(--g-superseded)", retracted: "var(--g-retracted)", invalidated: "var(--g-invalidated)" };
+let G = null;
+const toggleFocus = (id) => { S.focus = S.focus === id ? null : id; drawGraph(); S.focus ? loadAudit() : ($("#audit").hidden = true); };
+async function loadGraph() {
+  G = await api("/api/graph?user=" + U());
+  if (S.focus && !G.decisions.some((d) => d.id === S.focus)) S.focus = null;
+  renderRecent();
+  if (S.view === "graph") drawGraph();
+  if (S.focus && S.view === "graph") loadAudit(); else $("#audit").hidden = true;
+}
+function renderRecent() {
+  const box = $("#recent");
+  box.replaceChildren();
+  const last = (G ? G.decisions : []).slice(-4).reverse();
+  if (!last.length) { box.append(h("p", { class: "hint", style: "margin:2px 12px" }, "None yet")); return; }
+  last.forEach((d) => box.append(h("button", { onclick: () => { S.focus = d.id; showView("graph"); loadAudit(); } }, cap(nice(d.pick)), h("small", {}, "Day " + d.day))));
+}
+function drawGraph() {
+  const svg = $("#svg");
+  svg.replaceChildren();
+  const bar = $("#decisions");
+  bar.replaceChildren();
+  if (!G || !G.facts.length) {
+    bar.append(h("span", { class: "hint" }, "Nothing to draw yet. Tell me something first."));
+    svg.setAttribute("viewBox", "0 0 10 10"); svg.setAttribute("width", "10"); svg.setAttribute("height", "10");
+    return;
+  }
+  G.decisions.slice(-12).forEach((d) => bar.append(h("button", { class: "chip", "aria-pressed": String(S.focus === d.id), onclick: () => toggleFocus(d.id) },
+    "Day " + d.day + " · " + nice(d.pick))));
+
+  const byKey = new Map();
+  G.facts.forEach((f) => { if (!byKey.has(f.key)) byKey.set(f.key, []); byKey.get(f.key).push(f); });
+  const keys = [...byKey.keys()];
+  const W = 132, H = 40, X0 = 250, DX = 156, ROW = 62, Y0 = 26;
+  const pos = new Map();
+  keys.forEach((k, i) => byKey.get(k).forEach((f, j) => pos.set(f.id, { x: X0 + j * DX, y: Y0 + i * ROW, f })));
+  const maxChain = Math.max(...keys.map((k) => byKey.get(k).length));
+  const rowsBottom = Y0 + keys.length * ROW;
+  const decs = G.decisions;
+  const perLine = Math.max(4, Math.floor((X0 + maxChain * DX - 40) / 100));
+  const decY = rowsBottom + 60;
+  const dpos = new Map();
+  decs.forEach((d, i) => dpos.set(d.id, { x: 70 + (i % perLine) * 100, y: decY + Math.floor(i / perLine) * 78 }));
+  const width = Math.max(720, X0 + maxChain * DX + 24, 70 + perLine * 100);
+  const height = decY + Math.ceil(Math.max(1, decs.length) / perLine) * 78 + 20;
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("width", width); svg.setAttribute("height", height);
+
+  const fd = S.focus ? decs.find((d) => d.id === S.focus) : null;
+  const usedIds = new Set(fd ? fd.used : []);
+  const hotKeys = new Set([...usedIds].map((id) => pos.get(id)?.f.key).filter(Boolean));
+  const dimFact = (f) => fd && !hotKeys.has(f.key);
+
+  const defs = s("defs");
+  for (const [id, col] of [["arr", "var(--g-superseded)"], ["arrd", "var(--g-derived)"], ["arru", "var(--g-used)"]]) {
+    defs.append(s("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" },
+      s("path", { d: "M0,0 L10,5 L0,10 z", fill: col })));
+  }
+  svg.append(defs);
+  const edges = s("g"), nodes = s("g");
+  svg.append(edges, nodes);
+
+  G.superseded.forEach(([a, b]) => {
+    const pa = pos.get(a), pb = pos.get(b); if (!pa || !pb) return;
+    edges.append(s("line", { x1: pa.x + W, y1: pa.y + H / 2, x2: pb.x - 2, y2: pb.y + H / 2, stroke: "var(--g-superseded)", "stroke-width": "1.5",
+      "marker-end": "url(#arr)", class: dimFact(pa.f) ? "dim" : "" }));
+  });
+  G.derived.forEach(([c, p]) => {
+    const pc = pos.get(c), pp = pos.get(p); if (!pc || !pp) return;
+    const x1 = pc.x + 12, y1 = pc.y, x2 = pp.x + 12, y2 = pp.y + H;
+    edges.append(s("path", { d: "M" + x1 + "," + y1 + " C" + (x1 - 70) + "," + (y1 - 20) + " " + (x2 - 70) + "," + (y2 + 20) + " " + x2 + "," + y2,
+      fill: "none", stroke: "var(--g-derived)", "stroke-width": "1.4", "stroke-dasharray": "5 3", "marker-end": "url(#arrd)", class: dimFact(pc.f) ? "dim" : "" }));
+  });
+  decs.forEach((d) => {
+    const dp = dpos.get(d.id);
+    d.used.forEach((fid) => {
+      const fp = pos.get(fid); if (!fp) return;
+      const hot = fd && fd.id === d.id;
+      edges.append(s("line", { x1: dp.x, y1: dp.y - 15, x2: fp.x + W / 2, y2: fp.y + H + 1, stroke: "var(--g-used)",
+        "stroke-width": hot ? "2.8" : "1", "marker-end": "url(#arru)", class: fd && !hot ? "dim" : "", opacity: hot ? "1" : (fd ? "" : ".4") }));
+    });
+  });
+
+  const mid = Y0 + (keys.length * ROW) / 2 - 20;
+  nodes.append(s("g", {}, s("rect", { x: 8, y: mid, width: 100, height: 40, rx: 20, fill: "var(--g-text)" }),
+    s("text", { x: 58, y: mid + 25, "text-anchor": "middle", style: "fill:var(--g-bg);font-weight:600;font-size:13px" }, "You")));
+  if (fd) {
+    const dp = dpos.get(fd.id);
+    edges.append(s("path", { d: "M58," + (mid + 40) + " C58," + (decY - 40) + " " + dp.x + "," + (decY - 60) + " " + dp.x + "," + (dp.y - 16),
+      fill: "none", stroke: "var(--g-text)", "stroke-width": "2", "stroke-dasharray": "2 4" }));
+  }
+  keys.forEach((k, i) => {
+    nodes.append(s("text", { x: X0 - 12, y: Y0 + i * ROW + H / 2 + 4, "text-anchor": "end", style: "fill:var(--g-muted)" }, nice(k).length > 26 ? nice(k).slice(0, 25) + "…" : nice(k)));
+  });
+  pos.forEach(({ x, y, f }) => {
+    const col = COLORS[f.status] || "var(--g-superseded)";
+    const g = s("g", { class: dimFact(f) ? "dim" : "" });
+    g.append(s("title", {}, f.key + " = " + f.value + " (" + f.status + ", day " + f.valid_from + " to " + (f.valid_to ?? "now") + ")"));
+    g.append(s("rect", { x, y, width: W, height: H, rx: 12, fill: "var(--g-card)", stroke: col, "stroke-width": usedIds.has(f.id) ? "3.2" : "1.6" }));
+    g.append(s("text", { x: x + 10, y: y + 17, style: "font-weight:600" }, nice(f.value).slice(0, 18)));
+    g.append(s("text", { x: x + 10, y: y + 32, style: "fill:" + col + ";font-size:11px" }, f.status + " · d" + f.valid_from + (f.valid_to != null ? "–" + f.valid_to : "–")));
+    nodes.append(g);
+  });
+  decs.forEach((d) => {
+    const { x, y } = dpos.get(d.id);
+    const hot = fd && fd.id === d.id;
+    const g = s("g", { class: "dec" + (fd && !hot ? " dim" : ""), tabindex: "0", role: "button", "aria-label": "Decision on day " + d.day + ": " + d.pick });
+    g.append(s("title", {}, "Day " + d.day + " (" + d.mode + "): " + d.pick));
+    g.append(s("polygon", { points: x + "," + (y - 16) + " " + (x + 18) + "," + y + " " + x + "," + (y + 16) + " " + (x - 18) + "," + y,
+      fill: hot ? "var(--g-used)" : "var(--g-card)", stroke: "var(--g-used)", "stroke-width": hot ? "2.5" : "1.6" }));
+    g.append(s("text", { x, y: y + 4, "text-anchor": "middle", style: hot ? "fill:var(--g-bg);font-weight:600;font-size:11px" : "font-weight:600;font-size:11px" }, "d" + d.day));
+    g.append(s("text", { x, y: y + 32, "text-anchor": "middle", style: "fill:var(--g-muted)" }, nice(d.pick).length > 14 ? nice(d.pick).slice(0, 13) + "…" : nice(d.pick)));
+    g.addEventListener("click", () => toggleFocus(d.id));
+    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleFocus(d.id); } });
+    nodes.append(g);
+  });
+}
+async function loadAudit() {
+  const box = $("#audit");
+  try {
+    const a = await api("/api/why?user=" + U() + "&decision=" + encodeURIComponent(S.focus));
+    const lines = ["On day " + a.day + " I picked " + nice(a.pick) + " from " + a.options.map(nice).join(" or "),
+                   "Graph path You → Decision: length " + a.path_length];
+    a.used.forEach((u) => lines.push("Used " + nice(u.key) + " = " + nice(u.value) + "   history: " + u.history.map((x) => x.value + " [" + x.status + "]").join(" → ")));
+    if (!a.used.length) lines.push("Used no stored facts.");
+    if (a.mode === "counsel") lines.push("Advice about " + a.contact + ". Principles that fired: " + (a.rules.join(", ") || "none") +
+      (a.values_applied.length ? ". Your values applied: " + a.values_applied.join(", ") : ""));
+    box.textContent = lines.join("\n");
+    box.hidden = false;
+    drawGraph();
+  } catch (e) { box.textContent = "Could not load the audit trail: " + e.message; box.hidden = false; }
+}
+
+// ---- people -----------------------------------------------------------------------------
+async function loadPeople() {
+  const p = await api("/api/people?user=" + U());
+  const box = $("#people");
+  box.replaceChildren();
+  box.append(h("p", { class: "lead" }, "The people you tell me about, and what I remember about each of them."));
+  if (!p.contacts.length) {
+    box.append(h("div", { class: "empty" }, h("b", {}, "Nobody yet"), "Try: \"my friend Sam cancelled again, should I say something?\""));
+  } else {
+    box.append(h("div", { class: "cards" }, p.contacts.map((c) => h("div", { class: "card" },
+      h("div", { class: "head" }, h("div", { class: "avatar" }, c.name.charAt(0).toUpperCase()), h("div", {}, h("h3", {}, c.name), h("span", { class: "hint" }, cap(c.relation)))),
+      h("div", {}, c.status ? h("span", { class: "status " + (c.status === "strained" ? "strained" : c.status === "fine" ? "fine" : "other") }, nice(c.status) + (c.source === "hearsay" ? " (hearsay)" : "")) : h("span", { class: "hint" }, "no status recorded"),
+        c.city ? h("span", { class: "badge" }, c.city) : null),
+      h("div", { class: "chips", style: "margin-top:10px" }, c.recent.length ? c.recent.map((e) => h("span", { class: "chip static" }, nice(e.kind) + " · day " + e.day)) : h("span", { class: "hint" }, "nothing has happened yet")),
+      c.promises.length ? h("div", { class: "hint", style: "margin-top:8px" }, "You owe: " + c.promises.map((x) => x.text).join("; ")) : null))));
+  }
+  box.append(h("h4", { class: "sub" }, "What you value"));
+  box.append(p.values.length ? h("div", { class: "chips" }, p.values.map((v) => h("span", { class: "chip static" }, nice(v.tag))))
+                             : h("p", { class: "hint" }, "Nothing yet. Try: \"I want to be someone who shows up\"."));
+}
+
+// ---- controls ---------------------------------------------------------------------------
+$("#form").addEventListener("submit", (e) => { e.preventDefault(); const t = $("#text").value; $("#text").value = ""; send(t); });
+$("#next").addEventListener("click", () => send("/next", { quiet: true }));
+$("#asof").addEventListener("input", (e) => { S.asOf = Number(e.target.value); loadMemory(); });
+$("#asof-prev").addEventListener("click", () => { S.asOf = Math.max(1, S.asOf - 1); $("#asof").value = S.asOf; loadMemory(); });
+$("#asof-next").addEventListener("click", () => { S.asOf = Math.min(S.today, S.asOf + 1); $("#asof").value = S.asOf; loadMemory(); });
+
+async function startFresh(wipeOld) {
+  if (wipeOld) await api("/api/reset", { user: S.user, confirm: true });
+  S.user = newId(); setId(S.user); S.focus = null; S.asOf = 1e9;
+  $("#log").replaceChildren(); welcome(); showView("chat");
+  await refreshAll();
+}
+async function resetMine() {
+  if (!confirm("Erase everything I remember about you and start with a blank memory?")) return;
+  try { await startFresh(true); } catch (e) { addMsg("bot err", "Error: " + e.message); }
+}
+$("#reset").addEventListener("click", resetMine);
+$("#qa-reset").addEventListener("click", resetMine);
+$("#qa-memory").addEventListener("click", () => showView("memory"));
+$("#qa-fix").addEventListener("click", () => { $("#text").value = "that was wrong about "; $("#text").focus(); });
+$("#qa-explain").addEventListener("click", () => {
+  if (G && G.decisions.length) { S.focus = G.decisions[G.decisions.length - 1].id; showView("graph"); loadAudit(); }
+  else note("Ask me to choose something first, then I can explain it.");
+});
+$("#home").addEventListener("click", showLanding);
+
+const STORY = ["I eat meat again", "I love fried chicken", "I love paneer wrap", "fried chicken or chana chaat?", "/day 10",
+               "I turned vegetarian", "fried chicken or chana chaat?", "/why", "/day 12", "I hate paneer wrap",
+               "paneer wrap or chana chaat?", "/day 14", "that was wrong about paneer wrap", "paneer wrap or chana chaat?",
+               "my friend Priya cancelled again, should I say something?"];
+async function playExample() {
+  if (S.playing) { S.playing = false; return; }
+  S.playing = true; $("#play").textContent = "■ Stop";
+  try {
+    await startFresh(false);                      // a new blank memory; nothing of yours is touched
+    note("Playing the demo story in a separate, blank memory. Press Start fresh when you want your own.");
+    for (const line of STORY) {
+      if (!S.playing) break;
+      await send(line, line.startsWith("/day") ? { quiet: true } : undefined);
+      await new Promise((r) => setTimeout(r, 1300));
+    }
+    if (S.playing) note("That was the story. Open Memory and drag the time-travel slider, or open Graph and pick a decision to see what it rested on.");
+  } catch (e) { addMsg("bot err", "Error: " + e.message); }
+  S.playing = false; $("#play").textContent = "▶ Play demo story";
+}
+$("#play").addEventListener("click", playExample);
+$("#story-play").addEventListener("click", playExample);
+
+document.querySelectorAll(".js-start").forEach((b) => b.addEventListener("click", () => showApp("chat")));
+document.querySelectorAll(".js-example").forEach((b) => b.addEventListener("click", () => { showApp("chat"); playExample(); }));
+
+// start: a returning tab goes straight to the app, a new visitor sees the landing page first
+setId(S.user);
+S.asOf = 1e9;
+if (store("started") === "1") showApp("chat");
+</script>
+</body>
+</html>
